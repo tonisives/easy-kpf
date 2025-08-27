@@ -11,12 +11,15 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-async fn set_kubectl_context(app_handle: tauri::AppHandle) -> Result<String, String> {
+async fn set_kubectl_context(
+    app_handle: tauri::AppHandle,
+    context: String,
+) -> Result<String, String> {
     let shell = app_handle.shell();
 
     let output = shell
         .command("kubectl")
-        .args(["config", "use-context", "hs-docn-cluster-1"])
+        .args(["config", "use-context", &context])
         .output()
         .await
         .map_err(|e| e.to_string())?;
@@ -149,6 +152,80 @@ async fn stop_port_forward(
 }
 
 #[tauri::command]
+async fn start_postgres_cluster_port_forward(
+    app_handle: tauri::AppHandle,
+    process_map: State<'_, ProcessMap>,
+) -> Result<String, String> {
+    let shell = app_handle.shell();
+
+    // Check if already running
+    {
+        let map = process_map.lock().unwrap();
+        if map.contains_key("postgres-cluster-rw") {
+            return Err("Postgres cluster port forwarding is already running".to_string());
+        }
+    }
+
+    let (_rx, child) = shell
+        .command("kubectl")
+        .args([
+            "-n",
+            "infra",
+            "port-forward",
+            "svc/postgres-cluster-rw",
+            "8100:5432",
+        ])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    let pid = child.pid();
+
+    {
+        let mut map = process_map.lock().unwrap();
+        map.insert("postgres-cluster-rw".to_string(), pid);
+    }
+
+    Ok(format!(
+        "Postgres cluster port forwarding started with PID: {}",
+        pid
+    ))
+}
+
+#[tauri::command]
+async fn start_vmks_grafana_port_forward(
+    app_handle: tauri::AppHandle,
+    process_map: State<'_, ProcessMap>,
+) -> Result<String, String> {
+    let shell = app_handle.shell();
+
+    // Check if already running
+    {
+        let map = process_map.lock().unwrap();
+        if map.contains_key("vmks-grafana") {
+            return Err("VMKS Grafana port forwarding is already running".to_string());
+        }
+    }
+
+    let (_rx, child) = shell
+        .command("kubectl")
+        .args(["-n", "infra", "port-forward", "svc/vmks-grafana", "2998:80"])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    let pid = child.pid();
+
+    {
+        let mut map = process_map.lock().unwrap();
+        map.insert("vmks-grafana".to_string(), pid);
+    }
+
+    Ok(format!(
+        "VMKS Grafana port forwarding started with PID: {}",
+        pid
+    ))
+}
+
+#[tauri::command]
 fn get_running_services(process_map: State<'_, ProcessMap>) -> Vec<String> {
     let map = process_map.lock().unwrap();
     map.keys().cloned().collect()
@@ -167,6 +244,8 @@ pub fn run() {
             set_kubectl_context,
             start_db_port_forward,
             start_grafana_port_forward,
+            start_postgres_cluster_port_forward,
+            start_vmks_grafana_port_forward,
             stop_port_forward,
             get_running_services
         ])

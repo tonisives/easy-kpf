@@ -101,6 +101,17 @@ button {
   border-left: 4px solid #646cff;
 }
 
+.context-section h2 {
+  margin: 0 0 1rem 0;
+  color: #333;
+}
+
+.context-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .context-button {
   background-color: #646cff;
   color: white;
@@ -128,31 +139,49 @@ button {
 }
 
 .service-group {
-  margin-bottom: 2rem;
-  padding: 1.5rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
   border: 1px solid #e1e5e9;
   border-radius: 8px;
   background-color: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+.service-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.service-info {
+  flex: 1;
+}
+
 .service-info h3 {
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.25rem 0;
   color: #333;
+  font-size: 1.1rem;
 }
 
 .service-info p {
-  margin: 0 0 1rem 0;
+  margin: 0;
   color: #666;
   font-family: monospace;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+}
+
+.service-status-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
 }
 
 .status {
-  display: inline-block;
   font-weight: 500;
   font-size: 0.9rem;
-  margin-bottom: 1rem;
+  white-space: nowrap;
 }
 
 .status.running {
@@ -161,10 +190,6 @@ button {
 
 .status.stopped {
   color: #ef4444;
-}
-
-.service-controls {
-  margin-top: 1rem;
 }
 
 .start-button {
@@ -259,6 +284,10 @@ button {
   .context-section {
     background-color: #3a3a3a;
     border-left-color: #646cff;
+  }
+  
+  .context-section h2 {
+    color: #f6f6f6;
   }
   
   .service-group {
