@@ -1,0 +1,289 @@
+.logo.vite:hover {
+  filter: drop-shadow(0 0 2em #747bff);
+}
+
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafb);
+}
+:root {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+
+  color: #0f0f0f;
+  background-color: #f6f6f6;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+.container {
+  margin: 0 auto;
+  padding: 2rem;
+  max-width: 900px;
+  text-align: left;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: 0.75s;
+}
+
+.logo.tauri:hover {
+  filter: drop-shadow(0 0 2em #24c8db);
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #535bf2;
+}
+
+h1 {
+  text-align: center;
+}
+
+input,
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  color: #0f0f0f;
+  background-color: #ffffff;
+  transition: border-color 0.25s;
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #396cd8;
+}
+button:active {
+  border-color: #396cd8;
+  background-color: #e8e8e8;
+}
+
+input,
+button {
+  outline: none;
+}
+
+#greet-input {
+  margin-right: 5px;
+}
+
+.context-section {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: #e8f2ff;
+  border-radius: 8px;
+  border-left: 4px solid #646cff;
+}
+
+.context-button {
+  background-color: #646cff;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.25s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.context-button:hover {
+  background-color: #5a5fcf;
+}
+
+.context-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.services-section h2 {
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.service-group {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.service-info h3 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.service-info p {
+  margin: 0 0 1rem 0;
+  color: #666;
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+.status {
+  display: inline-block;
+  font-weight: 500;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.status.running {
+  color: #22c55e;
+}
+
+.status.stopped {
+  color: #ef4444;
+}
+
+.service-controls {
+  margin-top: 1rem;
+}
+
+.start-button {
+  background-color: #22c55e;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.25s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.start-button:hover {
+  background-color: #16a34a;
+}
+
+.stop-button {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.25s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.stop-button:hover {
+  background-color: #dc2626;
+}
+
+.start-button:disabled,
+.stop-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.message {
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+}
+
+.message pre {
+  margin: 0 0 1rem 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.clear-button {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.25s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.clear-button:hover {
+  background-color: #5a6268;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f6f6f6;
+    background-color: #2f2f2f;
+  }
+
+  a:hover {
+    color: #24c8db;
+  }
+
+  input,
+  button {
+    color: #ffffff;
+    background-color: #0f0f0f98;
+  }
+  button:active {
+    background-color: #0f0f0f69;
+  }
+  
+  .context-section {
+    background-color: #3a3a3a;
+    border-left-color: #646cff;
+  }
+  
+  .service-group {
+    background-color: #3a3a3a;
+    border-color: #555;
+  }
+  
+  .service-info h3 {
+    color: #f6f6f6;
+  }
+  
+  .service-info p {
+    color: #b0b0b0;
+  }
+  
+  .services-section h2 {
+    color: #f6f6f6;
+  }
+  
+  .message {
+    background-color: #3a3a3a;
+    border-color: #555;
+  }
+  
+  .message pre {
+    color: #f6f6f6;
+  }
+}
