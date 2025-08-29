@@ -105,7 +105,15 @@ function App() {
       setMessage(result);
       await updateServiceStatus();
     } catch (error) {
-      setMessage(`Error: ${error}`);
+      const errorMessage = `${error}`;
+      setMessage(`Error: ${errorMessage}`);
+      
+      // If error indicates port forwarding is not running, reset the service state to stopped
+      if (errorMessage.includes("port forwarding is not running")) {
+        setServices(prev => prev.map(service => 
+          service.name === serviceName ? { ...service, running: false } : service
+        ));
+      }
     } finally {
       setLoading(null);
     }
