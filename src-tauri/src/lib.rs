@@ -252,7 +252,11 @@ async fn start_vmks_grafana_port_forward(
     }
 
     let current_context = get_current_context(&app_handle).await?;
-    set_kubectl_context(app_handle.clone(), "hs-gcp-cluster-1".to_string()).await?;
+    set_kubectl_context(
+        app_handle.clone(),
+        "gke_boxwood-theory-461104-s3_us-east4_cluster-1".to_string(),
+    )
+    .await?;
 
     let result = async {
         let (_rx, child) = shell

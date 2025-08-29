@@ -192,7 +192,7 @@ function App() {
         <ServiceCard
           name="vmks-grafana"
           displayName="VMKS Grafana (vmks-grafana)"
-          context="hs-gcp-cluster-1"
+          context="gke_boxwood-theory-461104-s3_us-east4_cluster-1"
           namespace="infra"
           ports="Port: 2998:80"
           isRunning={services.find(s => s.name === "vmks-grafana")?.running || false}

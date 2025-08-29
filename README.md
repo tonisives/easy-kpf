@@ -1,6 +1,6 @@
 # build
 
-`p build`
+`p tauri build`
 
 # Tauri + React + Typescript
 
