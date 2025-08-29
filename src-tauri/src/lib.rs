@@ -5,6 +5,14 @@ use tauri_plugin_shell::ShellExt;
 
 type ProcessMap = Mutex<HashMap<String, u32>>;
 
+struct PortForwardConfig {
+    service_key: String,
+    context: String,
+    namespace: String,
+    service: String,
+    ports: Vec<String>,
+}
+
 async fn get_current_context(app_handle: &tauri::AppHandle) -> Result<String, String> {
     let shell = app_handle.shell();
 
@@ -48,37 +56,34 @@ async fn set_kubectl_context(
     }
 }
 
-#[tauri::command]
-async fn start_db_port_forward(
+async fn start_port_forward_generic(
     app_handle: tauri::AppHandle,
     process_map: State<'_, ProcessMap>,
+    config: PortForwardConfig,
 ) -> Result<String, String> {
     let shell = app_handle.shell();
 
     {
         let map = process_map.lock().unwrap();
-        if map.contains_key("db-s") {
-            return Err("DB port forwarding is already running".to_string());
+        if map.contains_key(&config.service_key) {
+            return Err(format!(
+                "{} port forwarding is already running",
+                config.service_key
+            ));
         }
     }
 
     let current_context = get_current_context(&app_handle).await?;
-    set_kubectl_context(app_handle.clone(), "hs-docn-cluster-1".to_string()).await?;
+    set_kubectl_context(app_handle.clone(), config.context.clone()).await?;
 
     let result = async {
+        let mut args = vec!["-n", &config.namespace, "port-forward", &config.service];
+        let port_refs: Vec<&str> = config.ports.iter().map(|s| s.as_str()).collect();
+        args.extend(port_refs);
+
         let (_rx, child) = shell
             .command("kubectl")
-            .args([
-                "-n",
-                "monitoring",
-                "port-forward",
-                "svc/postgres-eth-job-proxy",
-                "5332:25060",
-                "5333:25061",
-                "5334:25062",
-                "5335:25063",
-                "5336:25064",
-            ])
+            .args(args)
             .spawn()
             .map_err(|e| e.to_string())?;
 
@@ -86,10 +91,13 @@ async fn start_db_port_forward(
 
         {
             let mut map = process_map.lock().unwrap();
-            map.insert("db-s".to_string(), pid);
+            map.insert(config.service_key.clone(), pid);
         }
 
-        Ok::<String, String>(format!("DB port forwarding started with PID: {}", pid))
+        Ok::<String, String>(format!(
+            "{} port forwarding started with PID: {}",
+            config.service_key, pid
+        ))
     }
     .await;
 
@@ -99,49 +107,41 @@ async fn start_db_port_forward(
 }
 
 #[tauri::command]
+async fn start_db_port_forward(
+    app_handle: tauri::AppHandle,
+    process_map: State<'_, ProcessMap>,
+) -> Result<String, String> {
+    let config = PortForwardConfig {
+        service_key: "db-s".to_string(),
+        context: "hs-docn-cluster-1".to_string(),
+        namespace: "monitoring".to_string(),
+        service: "svc/postgres-eth-job-proxy".to_string(),
+        ports: vec![
+            "5332:25060".to_string(),
+            "5333:25061".to_string(),
+            "5334:25062".to_string(),
+            "5335:25063".to_string(),
+            "5336:25064".to_string(),
+        ],
+    };
+
+    start_port_forward_generic(app_handle, process_map, config).await
+}
+
+#[tauri::command]
 async fn start_grafana_port_forward(
     app_handle: tauri::AppHandle,
     process_map: State<'_, ProcessMap>,
 ) -> Result<String, String> {
-    let shell = app_handle.shell();
+    let config = PortForwardConfig {
+        service_key: "grafana-docn".to_string(),
+        context: "hs-docn-cluster-1".to_string(),
+        namespace: "monitoring".to_string(),
+        service: "svc/prometheus-grafana".to_string(),
+        ports: vec!["2999:80".to_string()],
+    };
 
-    {
-        let map = process_map.lock().unwrap();
-        if map.contains_key("grafana-docn") {
-            return Err("Grafana port forwarding is already running".to_string());
-        }
-    }
-
-    let current_context = get_current_context(&app_handle).await?;
-    set_kubectl_context(app_handle.clone(), "hs-docn-cluster-1".to_string()).await?;
-
-    let result = async {
-        let (_rx, child) = shell
-            .command("kubectl")
-            .args([
-                "-n",
-                "monitoring",
-                "port-forward",
-                "svc/prometheus-grafana",
-                "2999:80",
-            ])
-            .spawn()
-            .map_err(|e| e.to_string())?;
-
-        let pid = child.pid();
-
-        {
-            let mut map = process_map.lock().unwrap();
-            map.insert("grafana-docn".to_string(), pid);
-        }
-
-        Ok::<String, String>(format!("Grafana port forwarding started with PID: {}", pid))
-    }
-    .await;
-
-    set_kubectl_context(app_handle, current_context).await.ok();
-
-    result
+    start_port_forward_generic(app_handle, process_map, config).await
 }
 
 #[tauri::command]
@@ -191,49 +191,15 @@ async fn start_postgres_cluster_port_forward(
     app_handle: tauri::AppHandle,
     process_map: State<'_, ProcessMap>,
 ) -> Result<String, String> {
-    let shell = app_handle.shell();
+    let config = PortForwardConfig {
+        service_key: "postgres-cluster-rw".to_string(),
+        context: "tgs".to_string(),
+        namespace: "infra".to_string(),
+        service: "svc/postgres-cluster-rw".to_string(),
+        ports: vec!["8100:5432".to_string()],
+    };
 
-    // Check if already running
-    {
-        let map = process_map.lock().unwrap();
-        if map.contains_key("postgres-cluster-rw") {
-            return Err("Postgres cluster port forwarding is already running".to_string());
-        }
-    }
-
-    let current_context = get_current_context(&app_handle).await?;
-    set_kubectl_context(app_handle.clone(), "tgs".to_string()).await?;
-
-    let result = async {
-        let (_rx, child) = shell
-            .command("kubectl")
-            .args([
-                "-n",
-                "infra",
-                "port-forward",
-                "svc/postgres-cluster-rw",
-                "8100:5432",
-            ])
-            .spawn()
-            .map_err(|e| e.to_string())?;
-
-        let pid = child.pid();
-
-        {
-            let mut map = process_map.lock().unwrap();
-            map.insert("postgres-cluster-rw".to_string(), pid);
-        }
-
-        Ok::<String, String>(format!(
-            "Postgres cluster port forwarding started with PID: {}",
-            pid
-        ))
-    }
-    .await;
-
-    set_kubectl_context(app_handle, current_context).await.ok();
-
-    result
+    start_port_forward_generic(app_handle, process_map, config).await
 }
 
 #[tauri::command]
@@ -241,47 +207,15 @@ async fn start_vmks_grafana_port_forward(
     app_handle: tauri::AppHandle,
     process_map: State<'_, ProcessMap>,
 ) -> Result<String, String> {
-    let shell = app_handle.shell();
+    let config = PortForwardConfig {
+        service_key: "vmks-grafana".to_string(),
+        context: "hs-gcp-cluster-1".to_string(),
+        namespace: "infra".to_string(),
+        service: "svc/vmks-grafana".to_string(),
+        ports: vec!["2998:80".to_string()],
+    };
 
-    // Check if already running
-    {
-        let map = process_map.lock().unwrap();
-        if map.contains_key("vmks-grafana") {
-            return Err("VMKS Grafana port forwarding is already running".to_string());
-        }
-    }
-
-    let current_context = get_current_context(&app_handle).await?;
-    set_kubectl_context(
-        app_handle.clone(),
-        "gke_boxwood-theory-461104-s3_us-east4_cluster-1".to_string(),
-    )
-    .await?;
-
-    let result = async {
-        let (_rx, child) = shell
-            .command("kubectl")
-            .args(["-n", "infra", "port-forward", "svc/vmks-grafana", "2998:80"])
-            .spawn()
-            .map_err(|e| e.to_string())?;
-
-        let pid = child.pid();
-
-        {
-            let mut map = process_map.lock().unwrap();
-            map.insert("vmks-grafana".to_string(), pid);
-        }
-
-        Ok::<String, String>(format!(
-            "VMKS Grafana port forwarding started with PID: {}",
-            pid
-        ))
-    }
-    .await;
-
-    set_kubectl_context(app_handle, current_context).await.ok();
-
-    result
+    start_port_forward_generic(app_handle, process_map, config).await
 }
 
 #[tauri::command]
