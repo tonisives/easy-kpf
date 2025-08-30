@@ -566,6 +566,69 @@ button {
   background-color: #5a6268;
 }
 
+.input-with-detect {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.input-with-detect select {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.detect-button {
+  background-color: #8b5cf6;
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.25s;
+  white-space: nowrap;
+}
+
+.detect-button:hover:not(:disabled) {
+  background-color: #7c3aed;
+}
+
+.detect-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.suggested-ports {
+  margin-bottom: 0.5rem;
+}
+
+.port-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.port-suggestion {
+  background-color: #e1f5fe;
+  color: #0277bd;
+  border: 1px solid #b3e5fc;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+.port-suggestion:hover {
+  background-color: #b3e5fc;
+  border-color: #0277bd;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
@@ -686,5 +749,22 @@ button {
 
   .config-details strong {
     color: #b0b0b0;
+  }
+
+  .input-with-detect select {
+    background-color: #2f2f2f;
+    border-color: #555;
+    color: #f6f6f6;
+  }
+
+  .port-suggestion {
+    background-color: #1e3a8a;
+    color: #93c5fd;
+    border-color: #3b82f6;
+  }
+
+  .port-suggestion:hover {
+    background-color: #1d4ed8;
+    border-color: #93c5fd;
   }
 }

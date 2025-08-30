@@ -10,7 +10,7 @@ type ProcessMap = Mutex<HashMap<String, u32>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PortForwardConfig {
-    service_key: String,
+    name: String,
     context: String,
     namespace: String,
     service: String,
@@ -119,8 +119,166 @@ fn add_port_forward_config(config: PortForwardConfig) -> Result<(), String> {
 #[tauri::command]
 fn remove_port_forward_config(service_key: String) -> Result<(), String> {
     let mut configs = load_configs()?;
-    configs.retain(|c| c.service_key != service_key);
+    configs.retain(|c| c.name != service_key);
     save_configs(&configs)
+}
+
+#[tauri::command]
+async fn get_kubectl_contexts(app_handle: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let shell = app_handle.shell();
+    let output = shell
+        .command("kubectl")
+        .args(["config", "get-contexts", "-o", "name"])
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        let contexts = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        Ok(contexts)
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+#[tauri::command]
+async fn get_namespaces(
+    app_handle: tauri::AppHandle,
+    context: String,
+) -> Result<Vec<String>, String> {
+    let shell = app_handle.shell();
+    let current_context = get_current_context(&app_handle).await?;
+
+    // Switch to the specified context
+    set_kubectl_context(app_handle.clone(), context).await?;
+
+    let result = async {
+        let output = shell
+            .command("kubectl")
+            .args([
+                "get",
+                "namespaces",
+                "-o",
+                "jsonpath={.items[*].metadata.name}",
+            ])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            let namespaces = String::from_utf8_lossy(&output.stdout)
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect();
+            Ok::<Vec<String>, String>(namespaces)
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
+    }
+    .await;
+
+    // Restore original context
+    set_kubectl_context(app_handle, current_context).await.ok();
+
+    result
+}
+
+#[tauri::command]
+async fn get_services(
+    app_handle: tauri::AppHandle,
+    context: String,
+    namespace: String,
+) -> Result<Vec<String>, String> {
+    let shell = app_handle.shell();
+    let current_context = get_current_context(&app_handle).await?;
+
+    // Switch to the specified context
+    set_kubectl_context(app_handle.clone(), context).await?;
+
+    let result = async {
+        let output = shell
+            .command("kubectl")
+            .args([
+                "-n",
+                &namespace,
+                "get",
+                "services",
+                "-o",
+                "jsonpath={.items[*].metadata.name}",
+            ])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            let services = String::from_utf8_lossy(&output.stdout)
+                .split_whitespace()
+                .map(|s| format!("svc/{}", s))
+                .collect();
+            Ok::<Vec<String>, String>(services)
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
+    }
+    .await;
+
+    // Restore original context
+    set_kubectl_context(app_handle, current_context).await.ok();
+
+    result
+}
+
+#[tauri::command]
+async fn get_service_ports(
+    app_handle: tauri::AppHandle,
+    context: String,
+    namespace: String,
+    service: String,
+) -> Result<Vec<String>, String> {
+    let shell = app_handle.shell();
+    let current_context = get_current_context(&app_handle).await?;
+
+    // Switch to the specified context
+    set_kubectl_context(app_handle.clone(), context).await?;
+
+    let service_name = service.strip_prefix("svc/").unwrap_or(&service);
+
+    let result = async {
+        let output = shell
+            .command("kubectl")
+            .args([
+                "-n",
+                &namespace,
+                "get",
+                "service",
+                service_name,
+                "-o",
+                "jsonpath={.spec.ports[*].port}",
+            ])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            let ports = String::from_utf8_lossy(&output.stdout)
+                .split_whitespace()
+                .map(|port| format!("{}:{}", port, port)) // Default to same port for local:remote
+                .collect();
+            Ok::<Vec<String>, String>(ports)
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
+    }
+    .await;
+
+    // Restore original context
+    set_kubectl_context(app_handle, current_context).await.ok();
+
+    result
 }
 
 #[tauri::command]
@@ -132,7 +290,7 @@ async fn start_port_forward_by_key(
     let configs = load_configs()?;
     let config = configs
         .into_iter()
-        .find(|c| c.service_key == service_key)
+        .find(|c| c.name == service_key)
         .ok_or_else(|| format!("Configuration not found for service: {}", service_key))?;
 
     start_port_forward_generic(app_handle, process_map, config).await
@@ -147,10 +305,10 @@ async fn start_port_forward_generic(
 
     {
         let map = process_map.lock().unwrap();
-        if map.contains_key(&config.service_key) {
+        if map.contains_key(&config.name) {
             return Err(format!(
                 "{} port forwarding is already running",
-                config.service_key
+                config.name
             ));
         }
     }
@@ -173,12 +331,12 @@ async fn start_port_forward_generic(
 
         {
             let mut map = process_map.lock().unwrap();
-            map.insert(config.service_key.clone(), pid);
+            map.insert(config.name.clone(), pid);
         }
 
         Ok::<String, String>(format!(
             "{} port forwarding started with PID: {}",
-            config.service_key, pid
+            config.name, pid
         ))
     }
     .await;
@@ -252,7 +410,11 @@ pub fn run() {
             get_running_services,
             get_port_forward_configs,
             add_port_forward_config,
-            remove_port_forward_config
+            remove_port_forward_config,
+            get_kubectl_contexts,
+            get_namespaces,
+            get_services,
+            get_service_ports
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

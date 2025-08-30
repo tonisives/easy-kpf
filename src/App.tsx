@@ -9,7 +9,7 @@ type ServiceStatus = {
 }
 
 type PortForwardConfig = {
-  service_key: string
+  name: string
   context: string
   namespace: string
   service: string
@@ -28,12 +28,19 @@ function App() {
     config: PortForwardConfig
     index: number
   } | null>(null)
+  let [availableContexts, setAvailableContexts] = useState<string[]>([])
+  let [availableNamespaces, setAvailableNamespaces] = useState<string[]>([])
+  let [availableServices, setAvailableServices] = useState<string[]>([])
+  let [availablePorts, setAvailablePorts] = useState<string[]>([])
+  let [selectedContext, setSelectedContext] = useState("")
+  let [selectedNamespace, setSelectedNamespace] = useState("")
+  let [selectedService, setSelectedService] = useState("")
 
   let loadConfigs = async () => {
     try {
       let loadedConfigs: PortForwardConfig[] = await invoke("get_port_forward_configs")
       setConfigs(loadedConfigs)
-      setServices(loadedConfigs.map((config) => ({ name: config.service_key, running: false })))
+      setServices(loadedConfigs.map((config) => ({ name: config.name, running: false })))
     } catch (error) {
       console.error("Failed to load configs:", error)
       setMessage(`Error loading configs: ${error}`)
@@ -87,7 +94,7 @@ function App() {
     try {
       await invoke("add_port_forward_config", { config })
       await loadConfigs()
-      setMessage(`Added configuration for ${config.service_key}`)
+      setMessage(`Added configuration for ${config.name}`)
     } catch (error) {
       setMessage(`Error adding config: ${error}`)
     }
@@ -108,9 +115,51 @@ function App() {
       await invoke("remove_port_forward_config", { serviceKey: oldServiceKey })
       await invoke("add_port_forward_config", { config: newConfig })
       await loadConfigs()
-      setMessage(`Updated configuration for ${newConfig.service_key}`)
+      setMessage(`Updated configuration for ${newConfig.name}`)
     } catch (error) {
       setMessage(`Error updating config: ${error}`)
+    }
+  }
+
+  let loadContexts = async () => {
+    try {
+      let contexts: string[] = await invoke("get_kubectl_contexts")
+      setAvailableContexts(contexts)
+    } catch (error) {
+      console.error("Failed to load contexts:", error)
+    }
+  }
+
+  let loadNamespaces = async (context: string) => {
+    if (!context) return
+    try {
+      let namespaces: string[] = await invoke("get_namespaces", { context })
+      setAvailableNamespaces(namespaces)
+    } catch (error) {
+      console.error("Failed to load namespaces:", error)
+      setAvailableNamespaces([])
+    }
+  }
+
+  let loadServices = async (context: string, namespace: string) => {
+    if (!context || !namespace) return
+    try {
+      let services: string[] = await invoke("get_services", { context, namespace })
+      setAvailableServices(services)
+    } catch (error) {
+      console.error("Failed to load services:", error)
+      setAvailableServices([])
+    }
+  }
+
+  let loadPorts = async (context: string, namespace: string, service: string) => {
+    if (!context || !namespace || !service) return
+    try {
+      let ports: string[] = await invoke("get_service_ports", { context, namespace, service })
+      setAvailablePorts(ports)
+    } catch (error) {
+      console.error("Failed to load ports:", error)
+      setAvailablePorts([])
     }
   }
 
@@ -177,20 +226,20 @@ function App() {
         </div>
 
         {configs.map((config) => {
-          let service = services.find((s) => s.name === config.service_key)
+          let service = services.find((s) => s.name === config.name)
           return (
             <ServiceCard
-              key={config.service_key}
-              name={config.service_key}
-              displayName={`${config.service_key} (${config.service})`}
+              key={config.name}
+              name={config.name}
+              displayName={`${config.name} (${config.service})`}
               context={config.context}
               namespace={config.namespace}
               ports={`Ports: ${config.ports.join(", ")}`}
               isRunning={service?.running || false}
-              isLoading={loading === config.service_key}
-              onStart={() => startPortForward(config.service_key)}
-              onStop={() => stopPortForward(config.service_key)}
-              onSettings={() => setActiveServiceSettings(config.service_key)}
+              isLoading={loading === config.name}
+              onStart={() => startPortForward(config.name)}
+              onStop={() => stopPortForward(config.name)}
+              onSettings={() => setActiveServiceSettings(config.name)}
             />
           )
         })}
@@ -211,41 +260,150 @@ function App() {
                   .filter((p) => p.length > 0)
 
                 let newConfig: PortForwardConfig = {
-                  service_key: formData.get("service_key") as string,
-                  context: formData.get("context") as string,
-                  namespace: formData.get("namespace") as string,
-                  service: formData.get("service") as string,
+                  name: formData.get("name") as string,
+                  context: selectedContext || (formData.get("context") as string),
+                  namespace: selectedNamespace || (formData.get("namespace") as string),
+                  service: selectedService || (formData.get("service") as string),
                   ports: ports,
                 }
 
                 addConfig(newConfig)
                 setShowAddForm(false)
+                setSelectedContext("")
+                setSelectedNamespace("")
+                setSelectedService("")
+                setAvailableContexts([])
+                setAvailableNamespaces([])
+                setAvailableServices([])
+                setAvailablePorts([])
               }}
             >
               <div className="form-group">
-                <label>Service Key:</label>
-                <input type="text" name="service_key" required />
+                <label>Name:</label>
+                <input type="text" name="name" placeholder="Custom name for this configuration" required />
+                <small>A friendly name to identify this port forward</small>
               </div>
               <div className="form-group">
                 <label>Context:</label>
-                <input type="text" name="context" required />
+                <div className="input-with-detect">
+                  <select 
+                    value={selectedContext} 
+                    onChange={(e) => {
+                      setSelectedContext(e.target.value)
+                      loadNamespaces(e.target.value)
+                      setSelectedNamespace("")
+                      setSelectedService("")
+                      setAvailableServices([])
+                      setAvailablePorts([])
+                    }}
+                  >
+                    <option value="">Select context...</option>
+                    {availableContexts.map(ctx => (
+                      <option key={ctx} value={ctx}>{ctx}</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={loadContexts} className="detect-button">
+                    Detect
+                  </button>
+                </div>
+                <input type="text" name="context" placeholder="Or enter manually" style={{marginTop: "0.5rem"}} />
               </div>
               <div className="form-group">
                 <label>Namespace:</label>
-                <input type="text" name="namespace" required />
+                <div className="input-with-detect">
+                  <select 
+                    value={selectedNamespace} 
+                    onChange={(e) => {
+                      setSelectedNamespace(e.target.value)
+                      loadServices(selectedContext, e.target.value)
+                      setSelectedService("")
+                      setAvailablePorts([])
+                    }}
+                    disabled={!selectedContext}
+                  >
+                    <option value="">Select namespace...</option>
+                    {availableNamespaces.map(ns => (
+                      <option key={ns} value={ns}>{ns}</option>
+                    ))}
+                  </select>
+                  <button 
+                    type="button" 
+                    onClick={() => loadNamespaces(selectedContext)} 
+                    className="detect-button"
+                    disabled={!selectedContext}
+                  >
+                    Detect
+                  </button>
+                </div>
+                <input type="text" name="namespace" placeholder="Or enter manually" style={{marginTop: "0.5rem"}} />
               </div>
               <div className="form-group">
                 <label>Service:</label>
-                <input type="text" name="service" placeholder="e.g., svc/my-service" required />
+                <div className="input-with-detect">
+                  <select 
+                    value={selectedService} 
+                    onChange={(e) => {
+                      setSelectedService(e.target.value)
+                      loadPorts(selectedContext, selectedNamespace, e.target.value)
+                    }}
+                    disabled={!selectedContext || !selectedNamespace}
+                  >
+                    <option value="">Select service...</option>
+                    {availableServices.map(svc => (
+                      <option key={svc} value={svc}>{svc}</option>
+                    ))}
+                  </select>
+                  <button 
+                    type="button" 
+                    onClick={() => loadServices(selectedContext, selectedNamespace)} 
+                    className="detect-button"
+                    disabled={!selectedContext || !selectedNamespace}
+                  >
+                    Detect
+                  </button>
+                </div>
+                <input type="text" name="service" placeholder="Or enter manually (e.g., svc/my-service)" style={{marginTop: "0.5rem"}} />
               </div>
               <div className="form-group">
                 <label>Ports:</label>
+                {availablePorts.length > 0 && (
+                  <div className="suggested-ports">
+                    <small>Detected ports (click to use):</small>
+                    <div className="port-suggestions">
+                      {availablePorts.map(port => (
+                        <button
+                          key={port}
+                          type="button"
+                          className="port-suggestion"
+                          onClick={() => {
+                            let portsInput = document.querySelector('input[name="ports"]') as HTMLInputElement
+                            if (portsInput) {
+                              let current = portsInput.value.trim()
+                              portsInput.value = current ? `${current}, ${port}` : port
+                            }
+                          }}
+                        >
+                          {port}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <input type="text" name="ports" placeholder="e.g., 8080:80, 9090:3000" required />
                 <small>Comma-separated list of local:remote ports</small>
               </div>
               <div className="form-actions">
                 <button type="submit">Add Configuration</button>
-                <button type="button" onClick={() => setShowAddForm(false)}>
+                <button type="button" onClick={() => {
+                  setShowAddForm(false)
+                  setSelectedContext("")
+                  setSelectedNamespace("")
+                  setSelectedService("")
+                  setAvailableContexts([])
+                  setAvailableNamespaces([])
+                  setAvailableServices([])
+                  setAvailablePorts([])
+                }}>
                   Cancel
                 </button>
               </div>
@@ -258,12 +416,12 @@ function App() {
         <div className="settings-modal">
           <div className="service-settings-popup">
             {(() => {
-              let config = configs.find(c => c.service_key === activeServiceSettings)
+              let config = configs.find(c => c.name === activeServiceSettings)
               if (!config) return null
-              let index = configs.findIndex(c => c.service_key === activeServiceSettings)
+              let index = configs.findIndex(c => c.name === activeServiceSettings)
               return (
                 <>
-                  <h3>Settings for {config.service_key}</h3>
+                  <h3>Settings for {config.name}</h3>
                   <div className="config-details">
                     <p><strong>Context:</strong> {config.context}</p>
                     <p><strong>Namespace:</strong> {config.namespace}</p>
@@ -283,7 +441,7 @@ function App() {
                     </button>
                     <button
                       onClick={() => {
-                        removeConfig(config.service_key)
+                        removeConfig(config.name)
                         setActiveServiceSettings(null)
                       }}
                       className="delete-button"
@@ -319,24 +477,24 @@ function App() {
                   .filter((p) => p.length > 0)
 
                 let updatedConfig: PortForwardConfig = {
-                  service_key: formData.get("service_key") as string,
+                  name: formData.get("name") as string,
                   context: formData.get("context") as string,
                   namespace: formData.get("namespace") as string,
                   service: formData.get("service") as string,
                   ports: ports,
                 }
 
-                updateConfig(editingConfig.config.service_key, updatedConfig)
+                updateConfig(editingConfig.config.name, updatedConfig)
                 setShowConfigForm(false)
                 setEditingConfig(null)
               }}
             >
               <div className="form-group">
-                <label>Service Key:</label>
+                <label>Name:</label>
                 <input
                   type="text"
-                  name="service_key"
-                  defaultValue={editingConfig.config.service_key}
+                  name="name"
+                  defaultValue={editingConfig.config.name}
                   required
                 />
               </div>
