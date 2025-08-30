@@ -1,3 +1,12 @@
+# easy kpf
+
+## keywords
+
+kubernetes port forward
+k8s port forward
+k8s
+kubernetes
+
 # build
 
 `p tauri build`
