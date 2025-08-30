@@ -9,7 +9,7 @@ kubernetes
 
 ## requirements
 
-kubectl with configured contexts
+kubectl a configured context
 
 # build
 
