@@ -8,15 +8,31 @@ type ServiceStatus = {
   running: boolean
 }
 
+type PortForwardConfig = {
+  service_key: string
+  context: string
+  namespace: string
+  service: string
+  ports: string[]
+}
+
 function App() {
-  let [services, setServices] = useState<ServiceStatus[]>([
-    { name: "db-s", running: false },
-    { name: "grafana-docn", running: false },
-    { name: "postgres-cluster-rw", running: false },
-    { name: "vmks-grafana", running: false },
-  ])
+  let [configs, setConfigs] = useState<PortForwardConfig[]>([])
+  let [services, setServices] = useState<ServiceStatus[]>([])
   let [message, setMessage] = useState("")
   let [loading, setLoading] = useState<string | null>(null)
+  let [showAddForm, setShowAddForm] = useState(false)
+
+  let loadConfigs = async () => {
+    try {
+      let loadedConfigs: PortForwardConfig[] = await invoke("get_port_forward_configs")
+      setConfigs(loadedConfigs)
+      setServices(loadedConfigs.map(config => ({ name: config.service_key, running: false })))
+    } catch (error) {
+      console.error("Failed to load configs:", error)
+      setMessage(`Error loading configs: ${error}`)
+    }
+  }
 
   let updateServiceStatus = async () => {
     try {
@@ -33,7 +49,7 @@ function App() {
   }
 
   useEffect(() => {
-    updateServiceStatus()
+    loadConfigs().then(updateServiceStatus)
   }, [])
 
   let setKubectlContext = async (context: string) => {
@@ -48,10 +64,10 @@ function App() {
     }
   }
 
-  let startDbPortForward = async () => {
-    setLoading("db-s")
+  let startPortForward = async (serviceKey: string) => {
+    setLoading(serviceKey)
     try {
-      let result: string = await invoke("start_db_port_forward")
+      let result: string = await invoke("start_port_forward_by_key", { serviceKey })
       setMessage(result)
       await updateServiceStatus()
     } catch (error) {
@@ -61,42 +77,23 @@ function App() {
     }
   }
 
-  let startGrafanaPortForward = async () => {
-    setLoading("grafana-docn")
+  let addConfig = async (config: PortForwardConfig) => {
     try {
-      let result: string = await invoke("start_grafana_port_forward")
-      setMessage(result)
-      await updateServiceStatus()
+      await invoke("add_port_forward_config", { config })
+      await loadConfigs()
+      setMessage(`Added configuration for ${config.service_key}`)
     } catch (error) {
-      setMessage(`Error: ${error}`)
-    } finally {
-      setLoading(null)
+      setMessage(`Error adding config: ${error}`)
     }
   }
 
-  let startPostgresClusterPortForward = async () => {
-    setLoading("postgres-cluster-rw")
+  let removeConfig = async (serviceKey: string) => {
     try {
-      let result: string = await invoke("start_postgres_cluster_port_forward")
-      setMessage(result)
-      await updateServiceStatus()
+      await invoke("remove_port_forward_config", { serviceKey })
+      await loadConfigs()
+      setMessage(`Removed configuration for ${serviceKey}`)
     } catch (error) {
-      setMessage(`Error: ${error}`)
-    } finally {
-      setLoading(null)
-    }
-  }
-
-  let startVmksGrafanaPortForward = async () => {
-    setLoading("vmks-grafana")
-    try {
-      let result: string = await invoke("start_vmks_grafana_port_forward")
-      setMessage(result)
-      await updateServiceStatus()
-    } catch (error) {
-      setMessage(`Error: ${error}`)
-    } finally {
-      setLoading(null)
+      setMessage(`Error removing config: ${error}`)
     }
   }
 
@@ -156,55 +153,92 @@ function App() {
 
       <div className="services-section">
         <h2>Port Forwarding Services</h2>
+        <div className="add-config-section">
+          <button 
+            onClick={() => setShowAddForm(true)}
+            className="add-button"
+          >
+            Add New Configuration
+          </button>
+        </div>
 
-        <ServiceCard
-          name="db-s"
-          displayName="DB Service (db-s)"
-          context="hs-docn-cluster-1"
-          namespace="monitoring"
-          ports="Ports: 5332:25060, 5333:25061, 5334:25062, 5335:25063, 5336:25064"
-          isRunning={services.find((s) => s.name === "db-s")?.running || false}
-          isLoading={loading === "db-s"}
-          onStart={startDbPortForward}
-          onStop={() => stopPortForward("db-s")}
-        />
-
-        <ServiceCard
-          name="grafana-docn"
-          displayName="Grafana (grafana-docn)"
-          context="hs-docn-cluster-1"
-          namespace="monitoring"
-          ports="Port: 2999:80"
-          isRunning={services.find((s) => s.name === "grafana-docn")?.running || false}
-          isLoading={loading === "grafana-docn"}
-          onStart={startGrafanaPortForward}
-          onStop={() => stopPortForward("grafana-docn")}
-        />
-
-        <ServiceCard
-          name="postgres-cluster-rw"
-          displayName="Postgres Cluster (postgres-cluster-rw)"
-          context="tgs"
-          namespace="infra"
-          ports="Port: 8100:5432"
-          isRunning={services.find((s) => s.name === "postgres-cluster-rw")?.running || false}
-          isLoading={loading === "postgres-cluster-rw"}
-          onStart={startPostgresClusterPortForward}
-          onStop={() => stopPortForward("postgres-cluster-rw")}
-        />
-
-        <ServiceCard
-          name="vmks-grafana"
-          displayName="VMKS Grafana (vmks-grafana)"
-          context="gke_boxwood-theory-461104-s3_us-east4_cluster-1"
-          namespace="infra"
-          ports="Port: 2998:80"
-          isRunning={services.find((s) => s.name === "vmks-grafana")?.running || false}
-          isLoading={loading === "vmks-grafana"}
-          onStart={startVmksGrafanaPortForward}
-          onStop={() => stopPortForward("vmks-grafana")}
-        />
+        {configs.map((config) => {
+          let service = services.find((s) => s.name === config.service_key)
+          return (
+            <div key={config.service_key} className="service-with-controls">
+              <ServiceCard
+                name={config.service_key}
+                displayName={`${config.service_key} (${config.service})`}
+                context={config.context}
+                namespace={config.namespace}
+                ports={`Ports: ${config.ports.join(", ")}`}
+                isRunning={service?.running || false}
+                isLoading={loading === config.service_key}
+                onStart={() => startPortForward(config.service_key)}
+                onStop={() => stopPortForward(config.service_key)}
+              />
+              <button 
+                onClick={() => removeConfig(config.service_key)}
+                className="remove-button"
+                title="Remove configuration"
+              >
+                Remove
+              </button>
+            </div>
+          )
+        })}
       </div>
+
+      {showAddForm && (
+        <div className="add-form-modal">
+          <div className="add-form">
+            <h3>Add New Port Forward Configuration</h3>
+            <form onSubmit={(e) => {
+              e.preventDefault()
+              let formData = new FormData(e.target as HTMLFormElement)
+              let portsString = formData.get("ports") as string
+              let ports = portsString.split(",").map(p => p.trim()).filter(p => p.length > 0)
+              
+              let newConfig: PortForwardConfig = {
+                service_key: formData.get("service_key") as string,
+                context: formData.get("context") as string,
+                namespace: formData.get("namespace") as string,
+                service: formData.get("service") as string,
+                ports: ports
+              }
+              
+              addConfig(newConfig)
+              setShowAddForm(false)
+            }}>
+              <div className="form-group">
+                <label>Service Key:</label>
+                <input type="text" name="service_key" required />
+              </div>
+              <div className="form-group">
+                <label>Context:</label>
+                <input type="text" name="context" required />
+              </div>
+              <div className="form-group">
+                <label>Namespace:</label>
+                <input type="text" name="namespace" required />
+              </div>
+              <div className="form-group">
+                <label>Service:</label>
+                <input type="text" name="service" placeholder="e.g., svc/my-service" required />
+              </div>
+              <div className="form-group">
+                <label>Ports:</label>
+                <input type="text" name="ports" placeholder="e.g., 8080:80, 9090:3000" required />
+                <small>Comma-separated list of local:remote ports</small>
+              </div>
+              <div className="form-actions">
+                <button type="submit">Add Configuration</button>
+                <button type="button" onClick={() => setShowAddForm(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {message && (
         <div className="message">

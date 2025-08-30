@@ -1,16 +1,101 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::State;
 use tauri_plugin_shell::ShellExt;
 
 type ProcessMap = Mutex<HashMap<String, u32>>;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct PortForwardConfig {
     service_key: String,
     context: String,
     namespace: String,
     service: String,
     ports: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PortForwardConfigs {
+    configs: Vec<PortForwardConfig>,
+}
+
+fn get_config_dir() -> Result<PathBuf, String> {
+    let config_dir = dirs::config_dir()
+        .ok_or("Could not find config directory")?
+        .join("easy-kpf");
+
+    fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
+    Ok(config_dir)
+}
+
+fn get_config_file_path() -> Result<PathBuf, String> {
+    Ok(get_config_dir()?.join("port-forwards.yaml"))
+}
+
+fn load_configs() -> Result<Vec<PortForwardConfig>, String> {
+    let config_path = get_config_file_path()?;
+
+    if !config_path.exists() {
+        let default_configs = PortForwardConfigs {
+            configs: vec![
+                PortForwardConfig {
+                    service_key: "db-s".to_string(),
+                    context: "hs-docn-cluster-1".to_string(),
+                    namespace: "monitoring".to_string(),
+                    service: "svc/postgres-eth-job-proxy".to_string(),
+                    ports: vec![
+                        "5332:25060".to_string(),
+                        "5333:25061".to_string(),
+                        "5334:25062".to_string(),
+                        "5335:25063".to_string(),
+                        "5336:25064".to_string(),
+                    ],
+                },
+                PortForwardConfig {
+                    service_key: "grafana-docn".to_string(),
+                    context: "hs-docn-cluster-1".to_string(),
+                    namespace: "monitoring".to_string(),
+                    service: "svc/prometheus-grafana".to_string(),
+                    ports: vec!["2999:80".to_string()],
+                },
+                PortForwardConfig {
+                    service_key: "postgres-cluster-rw".to_string(),
+                    context: "tgs".to_string(),
+                    namespace: "infra".to_string(),
+                    service: "svc/postgres-cluster-rw".to_string(),
+                    ports: vec!["8100:5432".to_string()],
+                },
+                PortForwardConfig {
+                    service_key: "vmks-grafana".to_string(),
+                    context: "hs-gcp-cluster-1".to_string(),
+                    namespace: "infra".to_string(),
+                    service: "svc/vmks-grafana".to_string(),
+                    ports: vec!["2998:80".to_string()],
+                },
+            ],
+        };
+
+        save_configs(&default_configs.configs)?;
+        return Ok(default_configs.configs);
+    }
+
+    let config_content = fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
+    let configs: PortForwardConfigs =
+        serde_yaml::from_str(&config_content).map_err(|e| e.to_string())?;
+    Ok(configs.configs)
+}
+
+fn save_configs(configs: &[PortForwardConfig]) -> Result<(), String> {
+    let config_path = get_config_file_path()?;
+    let configs_wrapper = PortForwardConfigs {
+        configs: configs.to_vec(),
+    };
+    let yaml_content = serde_yaml::to_string(&configs_wrapper).map_err(|e| e.to_string())?;
+    fs::write(&config_path, yaml_content).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 async fn get_current_context(app_handle: &tauri::AppHandle) -> Result<String, String> {
@@ -54,6 +139,40 @@ async fn set_kubectl_context(
     } else {
         Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
+}
+
+#[tauri::command]
+fn get_port_forward_configs() -> Result<Vec<PortForwardConfig>, String> {
+    load_configs()
+}
+
+#[tauri::command]
+fn add_port_forward_config(config: PortForwardConfig) -> Result<(), String> {
+    let mut configs = load_configs()?;
+    configs.push(config);
+    save_configs(&configs)
+}
+
+#[tauri::command]
+fn remove_port_forward_config(service_key: String) -> Result<(), String> {
+    let mut configs = load_configs()?;
+    configs.retain(|c| c.service_key != service_key);
+    save_configs(&configs)
+}
+
+#[tauri::command]
+async fn start_port_forward_by_key(
+    app_handle: tauri::AppHandle,
+    process_map: State<'_, ProcessMap>,
+    service_key: String,
+) -> Result<String, String> {
+    let configs = load_configs()?;
+    let config = configs
+        .into_iter()
+        .find(|c| c.service_key == service_key)
+        .ok_or_else(|| format!("Configuration not found for service: {}", service_key))?;
+
+    start_port_forward_generic(app_handle, process_map, config).await
 }
 
 async fn start_port_forward_generic(
@@ -239,8 +358,12 @@ pub fn run() {
             start_grafana_port_forward,
             start_postgres_cluster_port_forward,
             start_vmks_grafana_port_forward,
+            start_port_forward_by_key,
             stop_port_forward,
-            get_running_services
+            get_running_services,
+            get_port_forward_configs,
+            add_port_forward_config,
+            remove_port_forward_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

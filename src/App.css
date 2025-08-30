@@ -262,6 +262,137 @@ button {
   background-color: #5a6268;
 }
 
+.add-config-section {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.add-button {
+  background-color: #10b981;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.25s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.add-button:hover {
+  background-color: #059669;
+}
+
+.service-with-controls {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.service-with-controls .service-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.remove-button {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.25s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  align-self: center;
+  font-size: 0.9rem;
+}
+
+.remove-button:hover {
+  background-color: #dc2626;
+}
+
+.add-form-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.add-form {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.add-form h3 {
+  margin: 0 0 1.5rem 0;
+  color: #333;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 0.25rem;
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+.form-actions button[type="submit"] {
+  background-color: #10b981;
+  color: white;
+}
+
+.form-actions button[type="submit"]:hover {
+  background-color: #059669;
+}
+
+.form-actions button[type="button"] {
+  background-color: #6c757d;
+  color: white;
+}
+
+.form-actions button[type="button"]:hover {
+  background-color: #5a6268;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
@@ -314,5 +445,27 @@ button {
   
   .message pre {
     color: #f6f6f6;
+  }
+
+  .add-form {
+    background-color: #3a3a3a;
+  }
+
+  .add-form h3 {
+    color: #f6f6f6;
+  }
+
+  .form-group label {
+    color: #f6f6f6;
+  }
+
+  .form-group input {
+    background-color: #2f2f2f;
+    border-color: #555;
+    color: #f6f6f6;
+  }
+
+  .form-group small {
+    color: #b0b0b0;
   }
 }
