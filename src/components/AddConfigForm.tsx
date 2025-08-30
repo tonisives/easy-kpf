@@ -29,33 +29,46 @@ let AddConfigForm = ({
   let [selectedContext, setSelectedContext] = useState("")
   let [selectedNamespace, setSelectedNamespace] = useState("")
   let [selectedService, setSelectedService] = useState("")
+  let [loadingContexts, setLoadingContexts] = useState(false)
+  let [loadingNamespaces, setLoadingNamespaces] = useState(false)
+  let [loadingServices, setLoadingServices] = useState(false)
+  let [loadingPorts, setLoadingPorts] = useState(false)
 
   // Auto-load contexts on mount
   useEffect(() => {
+    setLoadingContexts(true)
     loadContexts()
+    // Note: We need to handle completion in parent component or add timeout
+    setTimeout(() => setLoadingContexts(false), 1000)
   }, [])
 
   // Auto-load namespaces when context changes
   useEffect(() => {
     if (selectedContext) {
+      setLoadingNamespaces(true)
       loadNamespaces(selectedContext)
       setSelectedNamespace("")
       setSelectedService("")
+      setTimeout(() => setLoadingNamespaces(false), 1000)
     }
   }, [selectedContext])
 
   // Auto-load services when namespace changes
   useEffect(() => {
     if (selectedContext && selectedNamespace) {
+      setLoadingServices(true)
       loadServices(selectedContext, selectedNamespace)
       setSelectedService("")
+      setTimeout(() => setLoadingServices(false), 1000)
     }
   }, [selectedNamespace])
 
   // Auto-load ports when service changes
   useEffect(() => {
     if (selectedContext && selectedNamespace && selectedService) {
+      setLoadingPorts(true)
       loadPorts(selectedContext, selectedNamespace, selectedService)
+      setTimeout(() => setLoadingPorts(false), 1000)
     }
   }, [selectedService])
 
@@ -107,51 +120,58 @@ let AddConfigForm = ({
             <select
               value={selectedContext}
               onChange={(e) => setSelectedContext(e.target.value)}
+              disabled={loadingContexts}
               required
             >
-              <option value="">Select context...</option>
+              <option value="">{loadingContexts ? "Loading contexts..." : "Select context..."}</option>
               {availableContexts.map((ctx) => (
                 <option key={ctx} value={ctx}>
                   {ctx}
                 </option>
               ))}
             </select>
+            {loadingContexts && <div className="loading-bar"><div className="loading-progress"></div></div>}
           </div>
           <div className="form-group">
             <label>Namespace:</label>
             <select
               value={selectedNamespace}
               onChange={(e) => setSelectedNamespace(e.target.value)}
-              disabled={!selectedContext}
+              disabled={!selectedContext || loadingNamespaces}
               required
+              style={{ opacity: !selectedContext || loadingNamespaces ? 0.6 : 1 }}
             >
-              <option value="">Select namespace...</option>
+              <option value="">{loadingNamespaces ? "Loading namespaces..." : "Select namespace..."}</option>
               {availableNamespaces.map((ns) => (
                 <option key={ns} value={ns}>
                   {ns}
                 </option>
               ))}
             </select>
+            {loadingNamespaces && <div className="loading-bar"><div className="loading-progress"></div></div>}
           </div>
           <div className="form-group">
             <label>Service:</label>
             <select
               value={selectedService}
               onChange={(e) => setSelectedService(e.target.value)}
-              disabled={!selectedContext || !selectedNamespace}
+              disabled={!selectedContext || !selectedNamespace || loadingServices}
               required
+              style={{ opacity: !selectedContext || !selectedNamespace || loadingServices ? 0.6 : 1 }}
             >
-              <option value="">Select service...</option>
+              <option value="">{loadingServices ? "Loading services..." : "Select service..."}</option>
               {availableServices.map((svc) => (
                 <option key={svc} value={svc}>
                   {svc}
                 </option>
               ))}
             </select>
+            {loadingServices && <div className="loading-bar"><div className="loading-progress"></div></div>}
           </div>
           <div className="form-group">
             <label>Ports:</label>
-            {availablePorts.length > 0 && (
+            {loadingPorts && <div className="loading-bar"><div className="loading-progress"></div></div>}
+            {availablePorts.length > 0 && !loadingPorts && (
               <div className="suggested-ports">
                 <small>Detected ports (click to use):</small>
                 <div className="port-suggestions">
