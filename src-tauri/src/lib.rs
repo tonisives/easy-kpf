@@ -39,44 +39,7 @@ fn load_configs() -> Result<Vec<PortForwardConfig>, String> {
     let config_path = get_config_file_path()?;
 
     if !config_path.exists() {
-        let default_configs = PortForwardConfigs {
-            configs: vec![
-                PortForwardConfig {
-                    service_key: "db-s".to_string(),
-                    context: "hs-docn-cluster-1".to_string(),
-                    namespace: "monitoring".to_string(),
-                    service: "svc/postgres-eth-job-proxy".to_string(),
-                    ports: vec![
-                        "5332:25060".to_string(),
-                        "5333:25061".to_string(),
-                        "5334:25062".to_string(),
-                        "5335:25063".to_string(),
-                        "5336:25064".to_string(),
-                    ],
-                },
-                PortForwardConfig {
-                    service_key: "grafana-docn".to_string(),
-                    context: "hs-docn-cluster-1".to_string(),
-                    namespace: "monitoring".to_string(),
-                    service: "svc/prometheus-grafana".to_string(),
-                    ports: vec!["2999:80".to_string()],
-                },
-                PortForwardConfig {
-                    service_key: "postgres-cluster-rw".to_string(),
-                    context: "tgs".to_string(),
-                    namespace: "infra".to_string(),
-                    service: "svc/postgres-cluster-rw".to_string(),
-                    ports: vec!["8100:5432".to_string()],
-                },
-                PortForwardConfig {
-                    service_key: "vmks-grafana".to_string(),
-                    context: "hs-gcp-cluster-1".to_string(),
-                    namespace: "infra".to_string(),
-                    service: "svc/vmks-grafana".to_string(),
-                    ports: vec!["2998:80".to_string()],
-                },
-            ],
-        };
+        let default_configs = PortForwardConfigs { configs: vec![] };
 
         save_configs(&default_configs.configs)?;
         return Ok(default_configs.configs);
@@ -226,44 +189,6 @@ async fn start_port_forward_generic(
 }
 
 #[tauri::command]
-async fn start_db_port_forward(
-    app_handle: tauri::AppHandle,
-    process_map: State<'_, ProcessMap>,
-) -> Result<String, String> {
-    let config = PortForwardConfig {
-        service_key: "db-s".to_string(),
-        context: "hs-docn-cluster-1".to_string(),
-        namespace: "monitoring".to_string(),
-        service: "svc/postgres-eth-job-proxy".to_string(),
-        ports: vec![
-            "5332:25060".to_string(),
-            "5333:25061".to_string(),
-            "5334:25062".to_string(),
-            "5335:25063".to_string(),
-            "5336:25064".to_string(),
-        ],
-    };
-
-    start_port_forward_generic(app_handle, process_map, config).await
-}
-
-#[tauri::command]
-async fn start_grafana_port_forward(
-    app_handle: tauri::AppHandle,
-    process_map: State<'_, ProcessMap>,
-) -> Result<String, String> {
-    let config = PortForwardConfig {
-        service_key: "grafana-docn".to_string(),
-        context: "hs-docn-cluster-1".to_string(),
-        namespace: "monitoring".to_string(),
-        service: "svc/prometheus-grafana".to_string(),
-        ports: vec!["2999:80".to_string()],
-    };
-
-    start_port_forward_generic(app_handle, process_map, config).await
-}
-
-#[tauri::command]
 async fn stop_port_forward(
     service_name: String,
     process_map: State<'_, ProcessMap>,
@@ -306,38 +231,6 @@ async fn stop_port_forward(
 }
 
 #[tauri::command]
-async fn start_postgres_cluster_port_forward(
-    app_handle: tauri::AppHandle,
-    process_map: State<'_, ProcessMap>,
-) -> Result<String, String> {
-    let config = PortForwardConfig {
-        service_key: "postgres-cluster-rw".to_string(),
-        context: "tgs".to_string(),
-        namespace: "infra".to_string(),
-        service: "svc/postgres-cluster-rw".to_string(),
-        ports: vec!["8100:5432".to_string()],
-    };
-
-    start_port_forward_generic(app_handle, process_map, config).await
-}
-
-#[tauri::command]
-async fn start_vmks_grafana_port_forward(
-    app_handle: tauri::AppHandle,
-    process_map: State<'_, ProcessMap>,
-) -> Result<String, String> {
-    let config = PortForwardConfig {
-        service_key: "vmks-grafana".to_string(),
-        context: "hs-gcp-cluster-1".to_string(),
-        namespace: "infra".to_string(),
-        service: "svc/vmks-grafana".to_string(),
-        ports: vec!["2998:80".to_string()],
-    };
-
-    start_port_forward_generic(app_handle, process_map, config).await
-}
-
-#[tauri::command]
 fn get_running_services(process_map: State<'_, ProcessMap>) -> Vec<String> {
     let map = process_map.lock().unwrap();
     map.keys().cloned().collect()
@@ -354,10 +247,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             set_kubectl_context,
-            start_db_port_forward,
-            start_grafana_port_forward,
-            start_postgres_cluster_port_forward,
-            start_vmks_grafana_port_forward,
             start_port_forward_by_key,
             stop_port_forward,
             get_running_services,

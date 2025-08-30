@@ -9,6 +9,7 @@ type ServiceCardProps = {
   isLoading: boolean;
   onStart: () => void;
   onStop: () => void;
+  onSettings: () => void;
 };
 
 function ServiceCard({
@@ -20,6 +21,7 @@ function ServiceCard({
   isLoading,
   onStart,
   onStop,
+  onSettings,
 }: ServiceCardProps) {
   return (
     <div className="service-group">
@@ -49,6 +51,13 @@ function ServiceCard({
               {isLoading ? "Stopping..." : "Stop"}
             </button>
           )}
+          <button
+            onClick={onSettings}
+            className="settings-icon-button"
+            title="Settings"
+          >
+            ⚙️
+          </button>
         </div>
       </div>
     </div>

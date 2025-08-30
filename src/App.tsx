@@ -22,12 +22,18 @@ function App() {
   let [message, setMessage] = useState("")
   let [loading, setLoading] = useState<string | null>(null)
   let [showAddForm, setShowAddForm] = useState(false)
+  let [activeServiceSettings, setActiveServiceSettings] = useState<string | null>(null)
+  let [showConfigForm, setShowConfigForm] = useState(false)
+  let [editingConfig, setEditingConfig] = useState<{
+    config: PortForwardConfig
+    index: number
+  } | null>(null)
 
   let loadConfigs = async () => {
     try {
       let loadedConfigs: PortForwardConfig[] = await invoke("get_port_forward_configs")
       setConfigs(loadedConfigs)
-      setServices(loadedConfigs.map(config => ({ name: config.service_key, running: false })))
+      setServices(loadedConfigs.map((config) => ({ name: config.service_key, running: false })))
     } catch (error) {
       console.error("Failed to load configs:", error)
       setMessage(`Error loading configs: ${error}`)
@@ -97,6 +103,17 @@ function App() {
     }
   }
 
+  let updateConfig = async (oldServiceKey: string, newConfig: PortForwardConfig) => {
+    try {
+      await invoke("remove_port_forward_config", { serviceKey: oldServiceKey })
+      await invoke("add_port_forward_config", { config: newConfig })
+      await loadConfigs()
+      setMessage(`Updated configuration for ${newConfig.service_key}`)
+    } catch (error) {
+      setMessage(`Error updating config: ${error}`)
+    }
+  }
+
   let stopPortForward = async (serviceName: string) => {
     setLoading(serviceName)
     try {
@@ -153,11 +170,8 @@ function App() {
 
       <div className="services-section">
         <h2>Port Forwarding Services</h2>
-        <div className="add-config-section">
-          <button 
-            onClick={() => setShowAddForm(true)}
-            className="add-button"
-          >
+        <div className="controls-section">
+          <button onClick={() => setShowAddForm(true)} className="add-button">
             Add New Configuration
           </button>
         </div>
@@ -165,26 +179,19 @@ function App() {
         {configs.map((config) => {
           let service = services.find((s) => s.name === config.service_key)
           return (
-            <div key={config.service_key} className="service-with-controls">
-              <ServiceCard
-                name={config.service_key}
-                displayName={`${config.service_key} (${config.service})`}
-                context={config.context}
-                namespace={config.namespace}
-                ports={`Ports: ${config.ports.join(", ")}`}
-                isRunning={service?.running || false}
-                isLoading={loading === config.service_key}
-                onStart={() => startPortForward(config.service_key)}
-                onStop={() => stopPortForward(config.service_key)}
-              />
-              <button 
-                onClick={() => removeConfig(config.service_key)}
-                className="remove-button"
-                title="Remove configuration"
-              >
-                Remove
-              </button>
-            </div>
+            <ServiceCard
+              key={config.service_key}
+              name={config.service_key}
+              displayName={`${config.service_key} (${config.service})`}
+              context={config.context}
+              namespace={config.namespace}
+              ports={`Ports: ${config.ports.join(", ")}`}
+              isRunning={service?.running || false}
+              isLoading={loading === config.service_key}
+              onStart={() => startPortForward(config.service_key)}
+              onStop={() => stopPortForward(config.service_key)}
+              onSettings={() => setActiveServiceSettings(config.service_key)}
+            />
           )
         })}
       </div>
@@ -193,23 +200,28 @@ function App() {
         <div className="add-form-modal">
           <div className="add-form">
             <h3>Add New Port Forward Configuration</h3>
-            <form onSubmit={(e) => {
-              e.preventDefault()
-              let formData = new FormData(e.target as HTMLFormElement)
-              let portsString = formData.get("ports") as string
-              let ports = portsString.split(",").map(p => p.trim()).filter(p => p.length > 0)
-              
-              let newConfig: PortForwardConfig = {
-                service_key: formData.get("service_key") as string,
-                context: formData.get("context") as string,
-                namespace: formData.get("namespace") as string,
-                service: formData.get("service") as string,
-                ports: ports
-              }
-              
-              addConfig(newConfig)
-              setShowAddForm(false)
-            }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                let formData = new FormData(e.target as HTMLFormElement)
+                let portsString = formData.get("ports") as string
+                let ports = portsString
+                  .split(",")
+                  .map((p) => p.trim())
+                  .filter((p) => p.length > 0)
+
+                let newConfig: PortForwardConfig = {
+                  service_key: formData.get("service_key") as string,
+                  context: formData.get("context") as string,
+                  namespace: formData.get("namespace") as string,
+                  service: formData.get("service") as string,
+                  ports: ports,
+                }
+
+                addConfig(newConfig)
+                setShowAddForm(false)
+              }}
+            >
               <div className="form-group">
                 <label>Service Key:</label>
                 <input type="text" name="service_key" required />
@@ -233,7 +245,151 @@ function App() {
               </div>
               <div className="form-actions">
                 <button type="submit">Add Configuration</button>
-                <button type="button" onClick={() => setShowAddForm(false)}>Cancel</button>
+                <button type="button" onClick={() => setShowAddForm(false)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {activeServiceSettings && (
+        <div className="settings-modal">
+          <div className="service-settings-popup">
+            {(() => {
+              let config = configs.find(c => c.service_key === activeServiceSettings)
+              if (!config) return null
+              let index = configs.findIndex(c => c.service_key === activeServiceSettings)
+              return (
+                <>
+                  <h3>Settings for {config.service_key}</h3>
+                  <div className="config-details">
+                    <p><strong>Context:</strong> {config.context}</p>
+                    <p><strong>Namespace:</strong> {config.namespace}</p>
+                    <p><strong>Service:</strong> {config.service}</p>
+                    <p><strong>Ports:</strong> {config.ports.join(", ")}</p>
+                  </div>
+                  <div className="service-settings-actions">
+                    <button
+                      onClick={() => {
+                        setEditingConfig({ config, index })
+                        setShowConfigForm(true)
+                        setActiveServiceSettings(null)
+                      }}
+                      className="edit-button"
+                    >
+                      Edit Configuration
+                    </button>
+                    <button
+                      onClick={() => {
+                        removeConfig(config.service_key)
+                        setActiveServiceSettings(null)
+                      }}
+                      className="delete-button"
+                    >
+                      Delete Configuration
+                    </button>
+                    <button 
+                      onClick={() => setActiveServiceSettings(null)} 
+                      className="close-button"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+
+      {showConfigForm && editingConfig && (
+        <div className="add-form-modal">
+          <div className="add-form">
+            <h3>Edit Port Forward Configuration</h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                let formData = new FormData(e.target as HTMLFormElement)
+                let portsString = formData.get("ports") as string
+                let ports = portsString
+                  .split(",")
+                  .map((p) => p.trim())
+                  .filter((p) => p.length > 0)
+
+                let updatedConfig: PortForwardConfig = {
+                  service_key: formData.get("service_key") as string,
+                  context: formData.get("context") as string,
+                  namespace: formData.get("namespace") as string,
+                  service: formData.get("service") as string,
+                  ports: ports,
+                }
+
+                updateConfig(editingConfig.config.service_key, updatedConfig)
+                setShowConfigForm(false)
+                setEditingConfig(null)
+              }}
+            >
+              <div className="form-group">
+                <label>Service Key:</label>
+                <input
+                  type="text"
+                  name="service_key"
+                  defaultValue={editingConfig.config.service_key}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Context:</label>
+                <input
+                  type="text"
+                  name="context"
+                  defaultValue={editingConfig.config.context}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Namespace:</label>
+                <input
+                  type="text"
+                  name="namespace"
+                  defaultValue={editingConfig.config.namespace}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Service:</label>
+                <input
+                  type="text"
+                  name="service"
+                  defaultValue={editingConfig.config.service}
+                  placeholder="e.g., svc/my-service"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Ports:</label>
+                <input
+                  type="text"
+                  name="ports"
+                  defaultValue={editingConfig.config.ports.join(", ")}
+                  placeholder="e.g., 8080:80, 9090:3000"
+                  required
+                />
+                <small>Comma-separated list of local:remote ports</small>
+              </div>
+              <div className="form-actions">
+                <button type="submit">Update Configuration</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfigForm(false)
+                    setEditingConfig(null)
+                  }}
+                >
+                  Cancel
+                </button>
               </div>
             </form>
           </div>

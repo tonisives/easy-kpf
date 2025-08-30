@@ -230,6 +230,23 @@ button {
   cursor: not-allowed;
 }
 
+.settings-icon-button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: background-color 0.25s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-icon-button:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
 .message {
   margin-top: 2rem;
   padding: 1rem;
@@ -262,9 +279,11 @@ button {
   background-color: #5a6268;
 }
 
-.add-config-section {
+.controls-section {
   margin-bottom: 1.5rem;
-  text-align: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
 }
 
 .add-button {
@@ -283,34 +302,188 @@ button {
   background-color: #059669;
 }
 
-.service-with-controls {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.service-with-controls .service-group {
-  flex: 1;
-  margin-bottom: 0;
-}
-
-.remove-button {
-  background-color: #ef4444;
+.settings-button {
+  background-color: #6366f1;
   color: white;
   border: none;
-  padding: 0.6rem 1rem;
+  padding: 0.8rem 1.5rem;
   border-radius: 6px;
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.25s;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  align-self: center;
-  font-size: 0.9rem;
 }
 
-.remove-button:hover {
+.settings-button:hover {
+  background-color: #4f46e5;
+}
+
+.settings-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.settings-popup {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 700px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.settings-popup h3 {
+  margin: 0 0 1.5rem 0;
+  color: #333;
+}
+
+.service-settings-popup {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.service-settings-popup h3 {
+  margin: 0 0 1.5rem 0;
+  color: #333;
+}
+
+.config-details {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e1e5e9;
+}
+
+.config-details p {
+  margin: 0.5rem 0;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.config-details strong {
+  color: #666;
+  font-weight: 600;
+}
+
+.service-settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.service-settings-actions button {
+  padding: 0.8rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.25s;
+}
+
+.settings-list {
+  margin-bottom: 1.5rem;
+}
+
+.config-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1rem;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.config-summary {
+  flex: 1;
+}
+
+.config-summary h4 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.config-summary p {
+  margin: 0 0 0.25rem 0;
+  color: #666;
+  font-size: 0.9rem;
+  font-family: monospace;
+}
+
+.config-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.edit-button {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.25s;
+}
+
+.edit-button:hover {
+  background-color: #2563eb;
+}
+
+.delete-button {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.25s;
+}
+
+.delete-button:hover {
   background-color: #dc2626;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.close-button {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.25s;
+}
+
+.close-button:hover {
+  background-color: #5a6268;
 }
 
 .add-form-modal {
@@ -466,6 +639,52 @@ button {
   }
 
   .form-group small {
+    color: #b0b0b0;
+  }
+
+  .settings-popup {
+    background-color: #3a3a3a;
+  }
+
+  .settings-popup h3 {
+    color: #f6f6f6;
+  }
+
+  .config-item {
+    background-color: #2f2f2f;
+    border-color: #555;
+  }
+
+  .config-summary h4 {
+    color: #f6f6f6;
+  }
+
+  .config-summary p {
+    color: #b0b0b0;
+  }
+
+  .settings-icon-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .service-settings-popup {
+    background-color: #3a3a3a;
+  }
+
+  .service-settings-popup h3 {
+    color: #f6f6f6;
+  }
+
+  .config-details {
+    background-color: #2f2f2f;
+    border-color: #555;
+  }
+
+  .config-details p {
+    color: #f6f6f6;
+  }
+
+  .config-details strong {
     color: #b0b0b0;
   }
 }
