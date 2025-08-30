@@ -4,10 +4,10 @@ import { PortForwardConfig } from "../hooks/hooks"
 type AddConfigFormProps = {
   onAdd: (config: PortForwardConfig) => void
   onClose: () => void
-  loadContexts: () => void
-  loadNamespaces: (context: string) => void
-  loadServices: (context: string, namespace: string) => void
-  loadPorts: (context: string, namespace: string, service: string) => void
+  loadContexts: () => Promise<void>
+  loadNamespaces: (context: string) => Promise<void>
+  loadServices: (context: string, namespace: string) => Promise<void>
+  loadPorts: (context: string, namespace: string, service: string) => Promise<void>
   availableContexts: string[]
   availableNamespaces: string[]
   availableServices: string[]
@@ -36,39 +36,62 @@ let AddConfigForm = ({
 
   // Auto-load contexts on mount
   useEffect(() => {
-    setLoadingContexts(true)
-    loadContexts()
-    // Note: We need to handle completion in parent component or add timeout
-    setTimeout(() => setLoadingContexts(false), 1000)
+    let loadData = async () => {
+      setLoadingContexts(true)
+      try {
+        await loadContexts()
+      } finally {
+        setLoadingContexts(false)
+      }
+    }
+    loadData()
   }, [])
 
   // Auto-load namespaces when context changes
   useEffect(() => {
     if (selectedContext) {
-      setLoadingNamespaces(true)
-      loadNamespaces(selectedContext)
+      let loadData = async () => {
+        setLoadingNamespaces(true)
+        try {
+          await loadNamespaces(selectedContext)
+        } finally {
+          setLoadingNamespaces(false)
+        }
+      }
       setSelectedNamespace("")
       setSelectedService("")
-      setTimeout(() => setLoadingNamespaces(false), 1000)
+      loadData()
     }
   }, [selectedContext])
 
   // Auto-load services when namespace changes
   useEffect(() => {
     if (selectedContext && selectedNamespace) {
-      setLoadingServices(true)
-      loadServices(selectedContext, selectedNamespace)
+      let loadData = async () => {
+        setLoadingServices(true)
+        try {
+          await loadServices(selectedContext, selectedNamespace)
+        } finally {
+          setLoadingServices(false)
+        }
+      }
       setSelectedService("")
-      setTimeout(() => setLoadingServices(false), 1000)
+      loadData()
     }
   }, [selectedNamespace])
 
   // Auto-load ports when service changes
   useEffect(() => {
     if (selectedContext && selectedNamespace && selectedService) {
-      setLoadingPorts(true)
-      loadPorts(selectedContext, selectedNamespace, selectedService)
-      setTimeout(() => setLoadingPorts(false), 1000)
+      let loadData = async () => {
+        setLoadingPorts(true)
+        try {
+          await loadPorts(selectedContext, selectedNamespace, selectedService)
+        } finally {
+          setLoadingPorts(false)
+        }
+      }
+      loadData()
     }
   }, [selectedService])
 
