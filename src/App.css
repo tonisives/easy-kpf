@@ -568,38 +568,97 @@ button {
 
 .input-with-detect {
   display: flex;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.input-with-detect .input-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
-  align-items: center;
 }
 
 .input-with-detect select {
-  flex: 1;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 5"><path fill="%23666" d="m0 1 2 2 2-2z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 12px;
+  padding-right: 3rem;
+}
+
+.input-with-detect select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.input-with-detect select:disabled {
+  background-color: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.input-with-detect input[type="text"] {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.input-with-detect input[type="text"]:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .detect-button {
-  background-color: #8b5cf6;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  padding: 0.75rem 1rem;
-  border-radius: 4px;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.25s;
+  transition: all 0.2s ease;
   white-space: nowrap;
+  min-width: 80px;
+  height: fit-content;
+  align-self: flex-start;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .detect-button:hover:not(:disabled) {
-  background-color: #7c3aed;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+}
+
+.detect-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .detect-button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  background: #94a3b8;
+  transform: none;
+  box-shadow: none;
 }
 
 .suggested-ports {
@@ -752,9 +811,35 @@ button {
   }
 
   .input-with-detect select {
-    background-color: #2f2f2f;
-    border-color: #555;
-    color: #f6f6f6;
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 5"><path fill="%23d1d5db" d="m0 1 2 2 2-2z"/></svg>');
+  }
+
+  .input-with-detect select:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+  }
+
+  .input-with-detect select:disabled {
+    background-color: #1f2937;
+    color: #6b7280;
+  }
+
+  .input-with-detect input[type="text"] {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+  }
+
+  .input-with-detect input[type="text"]:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+  }
+
+  .detect-button:disabled {
+    background: #4b5563;
   }
 
   .port-suggestion {
