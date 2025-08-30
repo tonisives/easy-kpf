@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { PortForwardConfig } from "../hooks/hooks"
 
 type AddConfigFormProps = {
@@ -30,6 +30,35 @@ let AddConfigForm = ({
   let [selectedNamespace, setSelectedNamespace] = useState("")
   let [selectedService, setSelectedService] = useState("")
 
+  // Auto-load contexts on mount
+  useEffect(() => {
+    loadContexts()
+  }, [])
+
+  // Auto-load namespaces when context changes
+  useEffect(() => {
+    if (selectedContext) {
+      loadNamespaces(selectedContext)
+      setSelectedNamespace("")
+      setSelectedService("")
+    }
+  }, [selectedContext])
+
+  // Auto-load services when namespace changes
+  useEffect(() => {
+    if (selectedContext && selectedNamespace) {
+      loadServices(selectedContext, selectedNamespace)
+      setSelectedService("")
+    }
+  }, [selectedNamespace])
+
+  // Auto-load ports when service changes
+  useEffect(() => {
+    if (selectedContext && selectedNamespace && selectedService) {
+      loadPorts(selectedContext, selectedNamespace, selectedService)
+    }
+  }, [selectedService])
+
   let handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     let formData = new FormData(e.target as HTMLFormElement)
@@ -41,9 +70,9 @@ let AddConfigForm = ({
 
     let newConfig: PortForwardConfig = {
       name: formData.get("name") as string,
-      context: selectedContext || (formData.get("context") as string),
-      namespace: selectedNamespace || (formData.get("namespace") as string),
-      service: selectedService || (formData.get("service") as string),
+      context: selectedContext,
+      namespace: selectedNamespace,
+      service: selectedService,
       ports: ports,
     }
 
@@ -75,97 +104,50 @@ let AddConfigForm = ({
           </div>
           <div className="form-group">
             <label>Context:</label>
-            <div className="input-with-detect">
-              <div className="input-section">
-                <select
-                  value={selectedContext}
-                  onChange={(e) => {
-                    setSelectedContext(e.target.value)
-                    loadNamespaces(e.target.value)
-                    setSelectedNamespace("")
-                    setSelectedService("")
-                  }}
-                >
-                  <option value="">Select context...</option>
-                  {availableContexts.map((ctx) => (
-                    <option key={ctx} value={ctx}>
-                      {ctx}
-                    </option>
-                  ))}
-                </select>
-                <input type="text" name="context" placeholder="Or enter manually" />
-              </div>
-              <button type="button" onClick={loadContexts} className="detect-button">
-                Detect
-              </button>
-            </div>
+            <select
+              value={selectedContext}
+              onChange={(e) => setSelectedContext(e.target.value)}
+              required
+            >
+              <option value="">Select context...</option>
+              {availableContexts.map((ctx) => (
+                <option key={ctx} value={ctx}>
+                  {ctx}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label>Namespace:</label>
-            <div className="input-with-detect">
-              <div className="input-section">
-                <select
-                  value={selectedNamespace}
-                  onChange={(e) => {
-                    setSelectedNamespace(e.target.value)
-                    loadServices(selectedContext, e.target.value)
-                    setSelectedService("")
-                  }}
-                  disabled={!selectedContext}
-                >
-                  <option value="">Select namespace...</option>
-                  {availableNamespaces.map((ns) => (
-                    <option key={ns} value={ns}>
-                      {ns}
-                    </option>
-                  ))}
-                </select>
-                <input type="text" name="namespace" placeholder="Or enter manually" />
-              </div>
-              <button
-                type="button"
-                onClick={() => loadNamespaces(selectedContext)}
-                className="detect-button"
-                disabled={!selectedContext}
-              >
-                Detect
-              </button>
-            </div>
+            <select
+              value={selectedNamespace}
+              onChange={(e) => setSelectedNamespace(e.target.value)}
+              disabled={!selectedContext}
+              required
+            >
+              <option value="">Select namespace...</option>
+              {availableNamespaces.map((ns) => (
+                <option key={ns} value={ns}>
+                  {ns}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label>Service:</label>
-            <div className="input-with-detect">
-              <div className="input-section">
-                <select
-                  value={selectedService}
-                  onChange={(e) => {
-                    setSelectedService(e.target.value)
-                    loadPorts(selectedContext, selectedNamespace, e.target.value)
-                  }}
-                  disabled={!selectedContext || !selectedNamespace}
-                >
-                  <option value="">Select service...</option>
-                  {availableServices.map((svc) => (
-                    <option key={svc} value={svc}>
-                      {svc}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  name="service"
-                  placeholder="Or enter manually (e.g., svc/my-service)"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => loadServices(selectedContext, selectedNamespace)}
-                className="detect-button"
-                disabled={!selectedContext || !selectedNamespace}
-              >
-                Detect
-              </button>
-            </div>
+            <select
+              value={selectedService}
+              onChange={(e) => setSelectedService(e.target.value)}
+              disabled={!selectedContext || !selectedNamespace}
+              required
+            >
+              <option value="">Select service...</option>
+              {availableServices.map((svc) => (
+                <option key={svc} value={svc}>
+                  {svc}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label>Ports:</label>
