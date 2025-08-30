@@ -21,7 +21,29 @@ async fn get_current_context(app_handle: &tauri::AppHandle) -> Result<String, St
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format_kubectl_error(&error))
+    }
+}
+
+fn format_kubectl_error(error: &str) -> String {
+    let error_lower = error.to_lowercase();
+
+    if error_lower.contains("unable to connect") || error_lower.contains("connection refused") {
+        "⚠️  Unable to connect to cluster. Check your internet connection and cluster status."
+            .to_string()
+    } else if error_lower.contains("unauthorized") || error_lower.contains("forbidden") {
+        "🔐 Authentication failed. For GKE clusters, run: gcloud auth application-default login"
+            .to_string()
+    } else if error_lower.contains("token") && error_lower.contains("expired") {
+        "⏰ Authentication token expired. For GKE clusters, run: gcloud auth application-default login".to_string()
+    } else if error_lower.contains("no cluster") || error_lower.contains("context") {
+        "🚫 No active kubectl context found. Configure kubectl with: kubectl config use-context <context-name>".to_string()
+    } else if error_lower.contains("gke_gcloud_auth_plugin") {
+        "🔧 GKE auth plugin required. Run: gcloud components install gke-gcloud-auth-plugin"
+            .to_string()
+    } else {
+        format!("❌ kubectl error: {}", error)
     }
 }
 
@@ -42,7 +64,8 @@ async fn set_kubectl_context(
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format_kubectl_error(&error))
     }
 }
 
@@ -83,7 +106,8 @@ async fn get_kubectl_contexts(app_handle: tauri::AppHandle) -> Result<Vec<String
             .collect();
         Ok(contexts)
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format_kubectl_error(&error))
     }
 }
 
@@ -115,7 +139,8 @@ async fn get_namespaces(
             .collect();
         Ok(namespaces)
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format_kubectl_error(&error))
     }
 }
 
@@ -150,7 +175,8 @@ async fn get_services(
             .collect();
         Ok(services)
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format_kubectl_error(&error))
     }
 }
 
@@ -189,7 +215,8 @@ async fn get_service_ports(
             .collect();
         Ok(ports)
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format_kubectl_error(&error))
     }
 }
 

@@ -112,8 +112,10 @@ export let useConfigs = (
     try {
       let contexts: string[] = await invoke("get_kubectl_contexts")
       setAvailableContexts(contexts)
+      setMessage("")
     } catch (error) {
       console.error("Failed to load contexts:", error)
+      setMessage(`${error}`)
     }
   }
 
@@ -122,8 +124,10 @@ export let useConfigs = (
     try {
       let namespaces: string[] = await invoke("get_namespaces", { context })
       setAvailableNamespaces(namespaces)
+      setMessage("")
     } catch (error) {
       console.error("Failed to load namespaces:", error)
+      setMessage(`${error}`)
       setAvailableNamespaces([])
     }
   }
@@ -133,8 +137,10 @@ export let useConfigs = (
     try {
       let services: string[] = await invoke("get_services", { context, namespace })
       setAvailableServices(services)
+      setMessage("")
     } catch (error) {
       console.error("Failed to load services:", error)
+      setMessage(`${error}`)
       setAvailableServices([])
     }
   }
@@ -144,8 +150,10 @@ export let useConfigs = (
     try {
       let ports: string[] = await invoke("get_service_ports", { context, namespace, service })
       setAvailablePorts(ports)
+      setMessage("")
     } catch (error) {
       console.error("Failed to load ports:", error)
+      setMessage(`${error}`)
       setAvailablePorts([])
     }
   }

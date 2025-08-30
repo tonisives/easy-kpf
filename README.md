@@ -1,24 +1,57 @@
-# easy kpf
+# Easy KPF - Kubernetes Port Forward Manager
 
-## keywords
+A simple, intuitive desktop application for managing Kubernetes port forwarding with a beautiful native interface.
 
-kubernetes port forward
-k8s port forward
-k8s
-kubernetes
+## Key Features
 
-## requirements
+### **One-Click Port Forwarding**
 
-kubectl a configured context
+- Start and stop port forwarding with a single click
+- Visual status indicators show which services are running
+- Support for multiple port mappings per service
 
-# build
+### **Configuration Management**
 
-`p tauri build`
+- Save and manage port forwarding configurations
+- Quick access to frequently used services
+- Edit and update configurations on the fly
 
-# Tauri + React + Typescript
+### **Smart Kubernetes Integration**
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+- Browse all available kubectl contexts
+- Discover namespaces and services automatically
+- Auto-detect service ports for easy setup
 
-## Recommended IDE Setup
+### **Native Desktop Experience**
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- Fast, responsive native application built with Rust
+- Clean, modern interface
+- Cross-platform support (macOS, Windows, Linux)
+
+### **Developer Friendly**
+
+- No complex configuration files
+- Works with existing kubectl setup
+- Lightweight and resource-efficient
+
+## Requirements
+
+- kubectl installed and configured
+- At least one Kubernetes context configured
+- For GKE clusters: gcloud CLI tools
+
+## Quick Start
+
+1. Launch the app
+2. Select your Kubernetes context, namespace, and service
+3. Configure port mappings
+4. Click start to begin port forwarding
+5. Access your services at `localhost:<port>`
+
+## Build
+
+```bash
+pnpm tauri build
+```
+
+Perfect for developers working with Kubernetes who want a simple, reliable way to manage port forwarding without command-line complexity.
