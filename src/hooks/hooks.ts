@@ -61,7 +61,17 @@ export let useConfigs = (
       setMessage(result)
       await updateServiceStatus()
     } catch (error) {
-      setMessage(`Error: ${error}`)
+      let errorMessage = `${error}`
+      setMessage(`Error: ${errorMessage}`)
+
+      // If error indicates port forwarding is already running, set the service state to running
+      if (errorMessage.includes("port forwarding is already running")) {
+        setServices((prev) =>
+          prev.map((service) =>
+            service.name === serviceKey ? { ...service, running: true } : service,
+          ),
+        )
+      }
     } finally {
       setLoading(null)
     }

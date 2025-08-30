@@ -11,7 +11,7 @@ function App() {
 
   let [showAddForm, setShowAddForm] = useState(false)
   let [activeServiceSettings, setActiveServiceSettings] = useState<string | null>(null)
-  let [showConfigForm, setShowConfigForm] = useState(false)
+  let [_, setShowConfigForm] = useState(false)
   let [editingConfig, setEditingConfig] = useState<{
     config: PortForwardConfig
     index: number
@@ -43,15 +43,18 @@ function App() {
 
   return (
     <main className="container">
-      <h1>Kubernetes Port Forwarding</h1>
-
-      <div className="services-section">
-        <div className="controls-section">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1 style={{}}>Kubernetes Port Forwarding</h1>
+        <div>
           <button onClick={() => setShowAddForm(true)} className="add-button">
             Add New Configuration
           </button>
         </div>
+      </div>
 
+      <div style={{ height: "20px" }} />
+
+      <div className="services-section">
         {configs.map((config) => {
           let service = services.find((s) => s.name === config.name)
           return (

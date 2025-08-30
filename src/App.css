@@ -279,13 +279,6 @@ button {
   background-color: #5a6268;
 }
 
-.controls-section {
-  margin-bottom: 1.5rem;
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-}
-
 .add-button {
   background-color: #10b981;
   color: white;
@@ -706,38 +699,38 @@ button {
   button:active {
     background-color: #0f0f0f69;
   }
-  
+
   .context-section {
     background-color: #3a3a3a;
     border-left-color: #646cff;
   }
-  
+
   .context-section h2 {
     color: #f6f6f6;
   }
-  
+
   .service-group {
     background-color: #3a3a3a;
     border-color: #555;
   }
-  
+
   .service-info h3 {
     color: #f6f6f6;
   }
-  
+
   .service-info p {
     color: #b0b0b0;
   }
-  
+
   .services-section h2 {
     color: #f6f6f6;
   }
-  
+
   .message {
     background-color: #3a3a3a;
     border-color: #555;
   }
-  
+
   .message pre {
     color: #f6f6f6;
   }
