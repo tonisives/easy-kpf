@@ -7,6 +7,10 @@ k8s port forward
 k8s
 kubernetes
 
+## requirements
+
+kubectl with configured contexts
+
 # build
 
 `p tauri build`
