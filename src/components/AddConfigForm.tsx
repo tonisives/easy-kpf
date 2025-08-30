@@ -64,6 +64,13 @@ let AddConfigForm = ({
     }
   }, [selectedContext])
 
+  // Auto-select first available namespace when namespaces load
+  useEffect(() => {
+    if (availableNamespaces.length > 0 && !selectedNamespace && !loadingNamespaces) {
+      setSelectedNamespace(availableNamespaces[0])
+    }
+  }, [availableNamespaces, loadingNamespaces])
+
   // Auto-load services when namespace changes
   useEffect(() => {
     if (selectedContext && selectedNamespace) {
@@ -79,6 +86,13 @@ let AddConfigForm = ({
       loadData()
     }
   }, [selectedNamespace])
+
+  // Auto-select first available service when services load
+  useEffect(() => {
+    if (availableServices.length > 0 && !selectedService && !loadingServices) {
+      setSelectedService(availableServices[0])
+    }
+  }, [availableServices, loadingServices])
 
   // Auto-load ports when service changes
   useEffect(() => {
