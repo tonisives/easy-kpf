@@ -1,5 +1,19 @@
 import { useState, useEffect } from "react"
 import { invoke } from "@tauri-apps/api/core"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import ServiceCard from "./ServiceCard"
 import ServiceSettings from "./components/ServiceSettings"
 import AddConfigForm from "./components/AddConfigForm"
@@ -23,8 +37,6 @@ function App() {
   let [availableNamespaces, setAvailableNamespaces] = useState<string[]>([])
   let [availableServices, setAvailableServices] = useState<string[]>([])
   let [availablePorts, setAvailablePorts] = useState<string[]>([])
-  let [draggedIndex, setDraggedIndex] = useState<number | null>(null)
-  let [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   let {
     configs,
     services,
@@ -59,47 +71,32 @@ function App() {
     checkKubectlSetup()
   }, [])
 
-  let handleDragStart = (index: number) => (e: React.DragEvent<HTMLDivElement>) => {
-    console.log('Drag started:', index)
-    setDraggedIndex(index)
-    e.dataTransfer.effectAllowed = "move"
-    e.dataTransfer.setData('text/plain', index.toString())
-  }
+  let sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
-  let handleDragOver = (index: number) => (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-    
-    if (draggedIndex === null || draggedIndex === index) {
-      return
-    }
-    
-    setDragOverIndex(index)
-  }
+  let handleDragEnd = async (event: DragEndEvent) => {
+    let { active, over } = event
 
-  let handleDragLeave = () => {
-    setDragOverIndex(null)
-  }
-
-  let handleDrop = (index: number) => async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setDragOverIndex(null)
-    
-    console.log('Drop event:', { draggedIndex, targetIndex: index })
-    
-    if (draggedIndex !== null && draggedIndex !== index) {
-      let config = configs[draggedIndex]
-      console.log('Reordering:', config.name, 'from', draggedIndex, 'to', index)
+    if (active.id !== over?.id) {
+      let oldIndex = configs.findIndex(config => config.name === active.id)
+      let newIndex = configs.findIndex(config => config.name === over?.id)
       
-      try {
-        await reorderConfig(config.name, index)
-        console.log('Reorder completed successfully')
-      } catch (error) {
-        console.error('Reorder failed:', error)
+      if (oldIndex !== -1 && newIndex !== -1) {
+        let config = configs[oldIndex]
+        console.log('Reordering:', config.name, 'from', oldIndex, 'to', newIndex)
+        
+        try {
+          await reorderConfig(config.name, newIndex)
+          console.log('Reorder completed successfully')
+        } catch (error) {
+          console.error('Reorder failed:', error)
+        }
       }
     }
-    
-    setDraggedIndex(null)
   }
 
   if (kubectlConfigured === null) {
@@ -123,30 +120,37 @@ function App() {
 
       <div style={{ height: "20px" }} />
 
-      <div className="services-section" onDragLeave={handleDragLeave}>
-        {configs.map((config, index) => {
-          let service = services.find((s) => s.name === config.name)
-          return (
-            <ServiceCard
-              key={config.name}
-              name={config.name}
-              displayName={`${config.name} (${config.service})`}
-              context={config.context}
-              namespace={config.namespace}
-              ports={`Ports: ${config.ports.join(", ")}`}
-              isRunning={service?.running || false}
-              isLoading={loading === config.name}
-              onStart={() => startPortForward(config.name)}
-              onStop={() => stopPortForward(config.name)}
-              onSettings={() => setActiveServiceSettings(config.name)}
-              draggable={true}
-              onDragStart={handleDragStart(index)}
-              onDragOver={handleDragOver(index)}
-              onDrop={handleDrop(index)}
-              isDragOver={dragOverIndex === index}
-            />
-          )
-        })}
+      <div className="services-section">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={configs.map(config => config.name)}
+            strategy={verticalListSortingStrategy}
+          >
+            {configs.map((config) => {
+              let service = services.find((s) => s.name === config.name)
+              return (
+                <ServiceCard
+                  key={config.name}
+                  id={config.name}
+                  name={config.name}
+                  displayName={`${config.name} (${config.service})`}
+                  context={config.context}
+                  namespace={config.namespace}
+                  ports={`Ports: ${config.ports.join(", ")}`}
+                  isRunning={service?.running || false}
+                  isLoading={loading === config.name}
+                  onStart={() => startPortForward(config.name)}
+                  onStop={() => stopPortForward(config.name)}
+                  onSettings={() => setActiveServiceSettings(config.name)}
+                />
+              )
+            })}
+          </SortableContext>
+        </DndContext>
       </div>
 
       {showAddForm && (

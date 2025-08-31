@@ -1,4 +1,8 @@
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
 type ServiceCardProps = {
+  id: string
   name: string
   displayName: string
   context: string
@@ -9,14 +13,10 @@ type ServiceCardProps = {
   onStart: () => void
   onStop: () => void
   onSettings: () => void
-  draggable?: boolean
-  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void
-  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void
-  onDrop?: (e: React.DragEvent<HTMLDivElement>) => void
-  isDragOver?: boolean
 }
 
-function ServiceCard({
+let ServiceCard = ({
+  id,
   displayName,
   context,
   namespace,
@@ -26,26 +26,37 @@ function ServiceCard({
   onStart,
   onStop,
   onSettings,
-  draggable = false,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  isDragOver = false,
-}: ServiceCardProps) {
+}: ServiceCardProps) => {
+  let {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id })
+
+  let style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
   return (
-    <div 
-      className={`service-group ${isDragOver ? 'drag-over' : ''}`}
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="service-group"
     >
       <div className="service-header">
-        {draggable && (
-          <div className="drag-handle" title="Drag to reorder">
-            ⋮⋮
-          </div>
-        )}
+        <div
+          className="drag-handle"
+          title="Drag to reorder"
+          {...attributes}
+          {...listeners}
+        >
+          ⋮⋮
+        </div>
         <div className="service-info">
           <div style={{ display: "flex", gap: "10px" }}>
             <h3>{displayName}</h3>
