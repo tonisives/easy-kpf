@@ -25,6 +25,7 @@ export let useConfigs = (
   let [configs, setConfigs] = useState<PortForwardConfig[]>([])
   let [services, setServices] = useState<ServiceStatus[]>([])
   let [loading, setLoading] = useState<string | null>(null)
+  let [formError, setFormError] = useState<string | undefined>(undefined)
 
   let loadConfigs = async () => {
     try {
@@ -63,12 +64,11 @@ export let useConfigs = (
       ),
     )
     try {
-      let result: string = await invoke("start_port_forward_by_key", { serviceKey })
+      let result = await invoke("start_port_forward_by_key", { serviceKey })
       await updateServiceStatus()
     } catch (error) {
       let errorMessage = `${error}`
-      
-      // If error indicates port forwarding is already running, set the service state to running
+
       if (errorMessage.includes("port forwarding is already running")) {
         setServices((prev) =>
           prev.map((service) =>
@@ -88,12 +88,13 @@ export let useConfigs = (
   }
 
   let addConfig = async (config: PortForwardConfig) => {
+    setFormError(undefined)
     try {
       await invoke("add_port_forward_config", { config })
       await loadConfigs()
       setMessage(`Added configuration for ${config.name}`)
     } catch (error) {
-      setMessage(`Error adding config: ${error}`)
+      setFormError(`Error adding config: ${error}`)
     }
   }
 
@@ -119,70 +120,72 @@ export let useConfigs = (
   }
 
   let reorderConfig = async (serviceKey: string, newIndex: number) => {
-    // Optimistically update the UI immediately
-    let oldIndex = configs.findIndex(config => config.name === serviceKey)
+    let oldIndex = configs.findIndex((config) => config.name === serviceKey)
     if (oldIndex === -1) return
-    
+
     let newConfigs = [...configs]
     let [movedConfig] = newConfigs.splice(oldIndex, 1)
     newConfigs.splice(newIndex, 0, movedConfig)
     setConfigs(newConfigs)
-    
+
     try {
       await invoke("reorder_port_forward_config", { serviceKey, newIndex })
     } catch (error) {
-      // Revert on error
       setConfigs(configs)
       setMessage(`Error reordering config: ${error}`)
     }
   }
 
   let loadContexts = async () => {
+    setFormError(undefined)
     try {
       let contexts: string[] = await invoke("get_kubectl_contexts")
       setAvailableContexts(contexts)
       setMessage("")
     } catch (error) {
       console.error("Failed to load contexts:", error)
-      setMessage(`${error}`)
+      setFormError(`${error}`)
     }
   }
 
   let loadNamespaces = async (context: string) => {
     if (!context) return
+    setFormError(undefined)
     try {
       let namespaces: string[] = await invoke("get_namespaces", { context })
       setAvailableNamespaces(namespaces)
       setMessage("")
     } catch (error) {
       console.error("Failed to load namespaces:", error)
-      setMessage(`${error}`)
+      setFormError(`${error}`)
       setAvailableNamespaces([])
     }
   }
 
   let loadServices = async (context: string, namespace: string) => {
     if (!context || !namespace) return
+    setFormError(undefined)
     try {
       let services: string[] = await invoke("get_services", { context, namespace })
       setAvailableServices(services)
       setMessage("")
     } catch (error) {
       console.error("Failed to load services:", error)
-      setMessage(`${error}`)
+      setFormError(`${error}`)
       setAvailableServices([])
     }
   }
 
   let loadPorts = async (context: string, namespace: string, service: string) => {
     if (!context || !namespace || !service) return
+    setFormError(undefined)
     try {
       let ports: string[] = await invoke("get_service_ports", { context, namespace, service })
       setAvailablePorts(ports)
       setMessage("")
     } catch (error) {
       console.error("Failed to load ports:", error)
-      setMessage(`${error}`)
+      setFormError(`${error}`)
       setAvailablePorts([])
     }
   }
@@ -195,16 +198,17 @@ export let useConfigs = (
       ),
     )
     try {
-      let result: string = await invoke("stop_port_forward", { serviceName })
+      let result = await invoke("stop_port_forward", { serviceName })
       await updateServiceStatus()
     } catch (error) {
       let errorMessage = `${error}`
 
-      // If error indicates port forwarding is not running, reset the service state to stopped
       if (errorMessage.includes("port forwarding is not running")) {
         setServices((prev) =>
           prev.map((service) =>
-            service.name === serviceName ? { ...service, running: false, error: undefined } : service,
+            service.name === serviceName
+              ? { ...service, running: false, error: undefined }
+              : service,
           ),
         )
       } else {
@@ -227,10 +231,15 @@ export let useConfigs = (
     )
   }
 
+  let clearFormError = () => {
+    setFormError(undefined)
+  }
+
   return {
     configs,
     services,
     loading,
+    formError,
     loadConfigs,
     updateServiceStatus,
     startPortForward,
@@ -244,5 +253,6 @@ export let useConfigs = (
     loadPorts,
     stopPortForward,
     clearServiceError,
+    clearFormError,
   }
 }

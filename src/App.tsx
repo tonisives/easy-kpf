@@ -44,6 +44,7 @@ function App() {
     configs,
     services,
     loading,
+    formError,
     startPortForward,
     addConfig,
     removeConfig,
@@ -55,6 +56,7 @@ function App() {
     loadPorts,
     stopPortForward,
     clearServiceError,
+    clearFormError,
   } = useConfigs(
     setMessage,
     setAvailablePorts,
@@ -95,7 +97,6 @@ function App() {
 
       if (oldIndex !== -1 && newIndex !== -1) {
         let config = configs[oldIndex]
-        console.log("Reordering:", config.name, "from", oldIndex, "to", newIndex)
 
         reorderConfig(config.name, newIndex).catch((error: any) => {
           console.error("Reorder failed:", error)
@@ -203,6 +204,7 @@ function App() {
             setAvailableNamespaces([])
             setAvailableServices([])
             setAvailablePorts([])
+            clearFormError()
           }}
           loadContexts={loadContexts}
           loadNamespaces={loadNamespaces}
@@ -212,6 +214,8 @@ function App() {
           availableNamespaces={availableNamespaces}
           availableServices={availableServices}
           availablePorts={availablePorts}
+          error={formError}
+          onClearError={clearFormError}
         />
       )}
 

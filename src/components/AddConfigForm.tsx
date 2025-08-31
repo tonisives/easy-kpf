@@ -12,6 +12,8 @@ type AddConfigFormProps = {
   availableNamespaces: string[]
   availableServices: string[]
   availablePorts: string[]
+  error?: string
+  onClearError: () => void
 }
 
 let AddConfigForm = ({
@@ -25,6 +27,8 @@ let AddConfigForm = ({
   availableNamespaces,
   availableServices,
   availablePorts,
+  error,
+  onClearError,
 }: AddConfigFormProps) => {
   let [selectedContext, setSelectedContext] = useState("")
   let [selectedNamespace, setSelectedNamespace] = useState("")
@@ -141,6 +145,21 @@ let AddConfigForm = ({
     <div className="add-form-modal">
       <div className="add-form">
         <h3>Add New Port Forward Configuration</h3>
+        
+        {error && (
+          <div className="form-error">
+            <span className="form-error-text">{error}</span>
+            <button 
+              type="button"
+              onClick={onClearError} 
+              className="form-error-close"
+              title="Clear error"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Name:</label>

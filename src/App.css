@@ -575,6 +575,47 @@ button {
   color: #333;
 }
 
+.form-error {
+  margin-bottom: 1.5rem;
+  padding: 0.75rem 1rem;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.form-error-text {
+  flex: 1;
+  color: #dc2626;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.form-error-close {
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-size: 1.3rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.form-error-close:hover {
+  background-color: rgba(220, 38, 38, 0.1);
+}
+
 .form-group {
   margin-bottom: 1rem;
 }
@@ -821,6 +862,23 @@ button {
 
   .add-form h3 {
     color: #f6f6f6;
+  }
+
+  .form-error {
+    background-color: #450a0a;
+    border-color: #7f1d1d;
+  }
+
+  .form-error-text {
+    color: #f87171;
+  }
+
+  .form-error-close {
+    color: #f87171;
+  }
+
+  .form-error-close:hover {
+    background-color: rgba(248, 113, 113, 0.1);
   }
 
   .form-group label {
