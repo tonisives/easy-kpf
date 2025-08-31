@@ -11,16 +11,14 @@ use port_forwards::{load_configs, save_configs, PortForwardConfig};
 type ProcessMap = Mutex<HashMap<String, u32>>;
 
 fn get_kubeconfig_path() -> Option<String> {
-    // Try to get KUBECONFIG from environment, fallback to checking common locations
+    // Try to get KUBECONFIG from environment, fallback to default config
     std::env::var("KUBECONFIG")
         .or_else(|_| {
-            // Check if config-k3s exists (your custom config)
-            let k3s_config = format!(
-                "{}/.kube/config-k3s",
-                std::env::var("HOME").unwrap_or_default()
-            );
-            if std::path::Path::new(&k3s_config).exists() {
-                Ok(k3s_config)
+            // Check if default config exists
+            let default_config =
+                format!("{}/.kube/config", std::env::var("HOME").unwrap_or_default());
+            if std::path::Path::new(&default_config).exists() {
+                Ok(default_config)
             } else {
                 Err(std::env::VarError::NotPresent)
             }
@@ -33,7 +31,7 @@ async fn get_current_context(app_handle: &tauri::AppHandle) -> Result<String, St
     let kubectl_cmd = kubectl::get_kubectl_command();
 
     let mut command = shell.command(&kubectl_cmd);
-    if let Ok(kubeconfig) = std::env::var("KUBECONFIG") {
+    if let Some(kubeconfig) = get_kubeconfig_path() {
         command = command.env("KUBECONFIG", kubeconfig);
     }
 
@@ -81,7 +79,7 @@ async fn set_kubectl_context(
     let kubectl_cmd = kubectl::get_kubectl_command();
 
     let mut command = shell.command(&kubectl_cmd);
-    if let Ok(kubeconfig) = std::env::var("KUBECONFIG") {
+    if let Some(kubeconfig) = get_kubeconfig_path() {
         command = command.env("KUBECONFIG", kubeconfig);
     }
 
@@ -143,7 +141,7 @@ async fn get_kubectl_contexts(app_handle: tauri::AppHandle) -> Result<Vec<String
     let kubectl_cmd = kubectl::get_kubectl_command();
 
     let mut command = shell.command(&kubectl_cmd);
-    if let Ok(kubeconfig) = std::env::var("KUBECONFIG") {
+    if let Some(kubeconfig) = get_kubeconfig_path() {
         command = command.env("KUBECONFIG", kubeconfig);
     }
 
@@ -175,7 +173,7 @@ async fn get_namespaces(
     let kubectl_cmd = kubectl::get_kubectl_command();
 
     let mut command = shell.command(&kubectl_cmd);
-    if let Ok(kubeconfig) = std::env::var("KUBECONFIG") {
+    if let Some(kubeconfig) = get_kubeconfig_path() {
         command = command.env("KUBECONFIG", kubeconfig);
     }
 
@@ -214,7 +212,7 @@ async fn get_services(
     let kubectl_cmd = kubectl::get_kubectl_command();
 
     let mut command = shell.command(&kubectl_cmd);
-    if let Ok(kubeconfig) = std::env::var("KUBECONFIG") {
+    if let Some(kubeconfig) = get_kubeconfig_path() {
         command = command.env("KUBECONFIG", kubeconfig);
     }
 
@@ -258,7 +256,7 @@ async fn get_service_ports(
     let service_name = service.strip_prefix("svc/").unwrap_or(&service);
 
     let mut command = shell.command(&kubectl_cmd);
-    if let Ok(kubeconfig) = std::env::var("KUBECONFIG") {
+    if let Some(kubeconfig) = get_kubeconfig_path() {
         command = command.env("KUBECONFIG", kubeconfig);
     }
 
