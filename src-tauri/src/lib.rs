@@ -5,7 +5,8 @@ use tauri_plugin_shell::ShellExt;
 
 mod config;
 mod kubectl;
-use config::{load_configs, save_configs, PortForwardConfig};
+mod port_forwards;
+use port_forwards::{load_configs, save_configs, PortForwardConfig};
 
 type ProcessMap = Mutex<HashMap<String, u32>>;
 

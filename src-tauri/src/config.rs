@@ -2,19 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PortForwardConfig {
-    pub name: String,
-    pub context: String,
-    pub namespace: String,
-    pub service: String,
-    pub ports: Vec<String>,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 struct AppConfig {
     kubectl_path: Option<String>,
-    configs: Vec<PortForwardConfig>,
 }
 
 fn get_config_dir() -> Result<PathBuf, String> {
@@ -30,32 +20,11 @@ fn get_config_file_path() -> Result<PathBuf, String> {
     Ok(get_config_dir()?.join("app-config.yaml"))
 }
 
-pub fn load_configs() -> Result<Vec<PortForwardConfig>, String> {
-    let config_path = get_config_file_path()?;
-
-    if !config_path.exists() {
-        let default_configs = AppConfig {
-            kubectl_path: None,
-            configs: vec![],
-        };
-
-        save_configs(&default_configs.configs)?;
-        return Ok(default_configs.configs);
-    }
-
-    let config_content = fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
-    let configs: AppConfig = serde_yaml::from_str(&config_content).map_err(|e| e.to_string())?;
-    Ok(configs.configs)
-}
-
 fn load_app_config() -> Result<AppConfig, String> {
     let config_path = get_config_file_path()?;
 
     if !config_path.exists() {
-        let default_config = AppConfig {
-            kubectl_path: None,
-            configs: vec![],
-        };
+        let default_config = AppConfig { kubectl_path: None };
         save_app_config(&default_config)?;
         return Ok(default_config);
     }
@@ -70,12 +39,6 @@ fn save_app_config(config: &AppConfig) -> Result<(), String> {
     let yaml_content = serde_yaml::to_string(config).map_err(|e| e.to_string())?;
     fs::write(&config_path, yaml_content).map_err(|e| e.to_string())?;
     Ok(())
-}
-
-pub fn save_configs(configs: &[PortForwardConfig]) -> Result<(), String> {
-    let mut app_config = load_app_config()?;
-    app_config.configs = configs.to_vec();
-    save_app_config(&app_config)
 }
 
 pub fn load_kubectl_path() -> Result<String, String> {
