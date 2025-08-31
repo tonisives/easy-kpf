@@ -64,7 +64,7 @@ export let useConfigs = (
       ),
     )
     try {
-      let result = await invoke("start_port_forward_by_key", { serviceKey })
+      await invoke("start_port_forward_by_key", { serviceKey })
       await updateServiceStatus()
     } catch (error) {
       let errorMessage = `${error}`
@@ -198,7 +198,7 @@ export let useConfigs = (
       ),
     )
     try {
-      let result = await invoke("stop_port_forward", { serviceName })
+      await invoke("stop_port_forward", { serviceName })
       await updateServiceStatus()
     } catch (error) {
       let errorMessage = `${error}`
