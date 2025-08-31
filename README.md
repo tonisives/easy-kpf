@@ -1,46 +1,45 @@
 # Easy KPF - Kubernetes Port Forward Manager
 
-A simple, intuitive desktop application for managing Kubernetes port forwarding with a beautiful native interface.
+A simple, intuitive application for managing Kubernetes port forwarding.
 
 ## Key Features
 
-### **One-Click Port Forwarding**
+### One-Click Port Forwarding
 
 - Start and stop port forwarding with a single click
 - Visual status indicators show which services are running
 - Support for multiple port mappings per service
 
-### **Configuration Management**
+### Configuration Management
 
 - Save and manage port forwarding configurations
 - Quick access to frequently used services
 - Edit and update configurations on the fly
 
-### **Smart Kubernetes Integration**
+### Smart Kubernetes Integration
 
 - Browse all available kubectl contexts
 - Discover namespaces and services automatically
 - Auto-detect service ports for easy setup
 
-### **Native Desktop Experience**
+### Native Desktop Experience
 
 - Fast, responsive native application built with Rust
 - Clean, modern interface
 - Cross-platform support (macOS, Windows, Linux)
 
-### **Developer Friendly**
+### Developer Friendly
 
 - No complex configuration files
 - Works with existing kubectl setup
 - Lightweight and resource-efficient
 
-## Requirements
+### Requirements
 
 - kubectl installed and configured
 - At least one Kubernetes context configured
-- For GKE clusters: gcloud CLI tools
 
-## Quick Start
+### Quick Start
 
 1. Launch the app
 2. Select your Kubernetes context, namespace, and service
