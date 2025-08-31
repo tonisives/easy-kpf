@@ -23,6 +23,8 @@ function App() {
   let [availableNamespaces, setAvailableNamespaces] = useState<string[]>([])
   let [availableServices, setAvailableServices] = useState<string[]>([])
   let [availablePorts, setAvailablePorts] = useState<string[]>([])
+  let [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  let [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   let {
     configs,
     services,
@@ -31,6 +33,7 @@ function App() {
     addConfig,
     removeConfig,
     updateConfig,
+    reorderConfig,
     loadContexts,
     loadNamespaces,
     loadServices,
@@ -56,6 +59,33 @@ function App() {
     checkKubectlSetup()
   }, [])
 
+  let handleDragStart = (index: number) => (e: React.DragEvent<HTMLDivElement>) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = "move"
+  }
+
+  let handleDragOver = (index: number) => (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+    setDragOverIndex(index)
+  }
+
+  let handleDragLeave = () => {
+    setDragOverIndex(null)
+  }
+
+  let handleDrop = (index: number) => async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setDragOverIndex(null)
+    
+    if (draggedIndex !== null && draggedIndex !== index) {
+      let config = configs[draggedIndex]
+      await reorderConfig(config.name, index)
+    }
+    
+    setDraggedIndex(null)
+  }
+
   if (kubectlConfigured === null) {
     return <div style={{ padding: "20px", textAlign: "center" }}>Loading...</div>
   }
@@ -77,8 +107,8 @@ function App() {
 
       <div style={{ height: "20px" }} />
 
-      <div className="services-section">
-        {configs.map((config) => {
+      <div className="services-section" onDragLeave={handleDragLeave}>
+        {configs.map((config, index) => {
           let service = services.find((s) => s.name === config.name)
           return (
             <ServiceCard
@@ -93,6 +123,11 @@ function App() {
               onStart={() => startPortForward(config.name)}
               onStop={() => stopPortForward(config.name)}
               onSettings={() => setActiveServiceSettings(config.name)}
+              draggable={true}
+              onDragStart={handleDragStart(index)}
+              onDragOver={handleDragOver(index)}
+              onDrop={handleDrop(index)}
+              isDragOver={dragOverIndex === index}
             />
           )
         })}

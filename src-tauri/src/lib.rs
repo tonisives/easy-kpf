@@ -93,6 +93,25 @@ fn remove_port_forward_config(service_key: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn reorder_port_forward_config(service_key: String, new_index: usize) -> Result<(), String> {
+    let mut configs = load_configs()?;
+
+    let current_index = configs
+        .iter()
+        .position(|c| c.name == service_key)
+        .ok_or_else(|| format!("Configuration not found for service: {}", service_key))?;
+
+    if new_index >= configs.len() {
+        return Err("Invalid new index".to_string());
+    }
+
+    let config = configs.remove(current_index);
+    configs.insert(new_index, config);
+
+    save_configs(&configs)
+}
+
+#[tauri::command]
 async fn get_kubectl_contexts(app_handle: tauri::AppHandle) -> Result<Vec<String>, String> {
     let shell = app_handle.shell();
     let kubectl_cmd = kubectl::get_kubectl_command();
@@ -358,6 +377,7 @@ pub fn run() {
             get_port_forward_configs,
             add_port_forward_config,
             remove_port_forward_config,
+            reorder_port_forward_config,
             get_kubectl_contexts,
             get_namespaces,
             get_services,

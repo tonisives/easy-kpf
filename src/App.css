@@ -150,6 +150,35 @@ button {
   gap: 1rem;
 }
 
+.drag-handle {
+  cursor: grab;
+  padding: 0.5rem;
+  color: #666;
+  font-size: 1.2rem;
+  line-height: 1;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  transition: color 0.25s;
+}
+
+.drag-handle:hover {
+  color: #333;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.service-group.drag-over {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
 .service-info {
   flex: 1;
 }
@@ -708,6 +737,19 @@ button {
   .service-group {
     background-color: #3a3a3a;
     border-color: #555;
+  }
+
+  .service-group.drag-over {
+    border-color: #60a5fa;
+    background-color: #1e3a8a;
+  }
+
+  .drag-handle {
+    color: #b0b0b0;
+  }
+
+  .drag-handle:hover {
+    color: #f6f6f6;
   }
 
   .service-info h3 {

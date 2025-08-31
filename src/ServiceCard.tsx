@@ -9,6 +9,11 @@ type ServiceCardProps = {
   onStart: () => void
   onStop: () => void
   onSettings: () => void
+  draggable?: boolean
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void
+  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void
+  onDrop?: (e: React.DragEvent<HTMLDivElement>) => void
+  isDragOver?: boolean
 }
 
 function ServiceCard({
@@ -21,10 +26,26 @@ function ServiceCard({
   onStart,
   onStop,
   onSettings,
+  draggable = false,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  isDragOver = false,
 }: ServiceCardProps) {
   return (
-    <div className="service-group">
+    <div 
+      className={`service-group ${isDragOver ? 'drag-over' : ''}`}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
       <div className="service-header">
+        {draggable && (
+          <div className="drag-handle" title="Drag to reorder">
+            ⋮⋮
+          </div>
+        )}
         <div className="service-info">
           <div style={{ display: "flex", gap: "10px" }}>
             <h3>{displayName}</h3>

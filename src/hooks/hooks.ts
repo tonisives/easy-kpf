@@ -108,6 +108,15 @@ export let useConfigs = (
     }
   }
 
+  let reorderConfig = async (serviceKey: string, newIndex: number) => {
+    try {
+      await invoke("reorder_port_forward_config", { serviceKey, newIndex })
+      await loadConfigs()
+    } catch (error) {
+      setMessage(`Error reordering config: ${error}`)
+    }
+  }
+
   let loadContexts = async () => {
     try {
       let contexts: string[] = await invoke("get_kubectl_contexts")
@@ -191,6 +200,7 @@ export let useConfigs = (
     addConfig,
     removeConfig,
     updateConfig,
+    reorderConfig,
     loadContexts,
     loadNamespaces,
     loadServices,
