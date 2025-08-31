@@ -27,6 +27,7 @@ import { PortForwardConfig, useConfigs } from "./hooks/hooks"
 function App() {
   let [message, setMessage] = useState("")
   let [kubectlConfigured, setKubectlConfigured] = useState<boolean | null>(null)
+  let [showSettings, setShowSettings] = useState(false)
 
   let [showAddForm, setShowAddForm] = useState(false)
   let [activeServiceSettings, setActiveServiceSettings] = useState<string | null>(null)
@@ -111,17 +112,23 @@ function App() {
     return <div style={{ padding: "20px", textAlign: "center" }}>Loading...</div>
   }
 
-  if (!kubectlConfigured) {
-    return <SetupScreen onSetupComplete={() => setKubectlConfigured(true)} />
+  if (!kubectlConfigured || showSettings) {
+    return <SetupScreen onSetupComplete={() => {
+      setKubectlConfigured(true)
+      setShowSettings(false)
+    }} />
   }
 
   return (
     <main className="container">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{}}>Kubernetes Port Forwarding</h1>
-        <div>
+        <div style={{ display: "flex", gap: "10px" }}>
           <button onClick={() => setShowAddForm(true)} className="add-button">
             Add New Configuration
+          </button>
+          <button onClick={() => setShowSettings(true)} className="settings-icon-button" title="Settings">
+            ⚙️
           </button>
         </div>
       </div>
