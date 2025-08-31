@@ -38,8 +38,8 @@ let ServiceCard = ({
 
   let style = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging ? 'none' : transition,
-    opacity: isDragging ? 0 : 1,
+    transition: isDragging ? 'none' : transition || 'transform 200ms ease',
+    opacity: isDragging ? 0.5 : 1,
   }
 
   return (

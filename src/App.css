@@ -142,6 +142,9 @@ button {
   background-color: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   position: relative;
+  transition:
+    transform 200ms ease,
+    opacity 200ms ease;
 }
 
 .service-header {
@@ -153,15 +156,12 @@ button {
 
 .drag-handle {
   cursor: grab;
-  padding: 0.5rem;
   color: #666;
-  font-size: 1.2rem;
-  line-height: 1;
+  font-size: 1rem;
   user-select: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
   transition: color 0.25s;
 }
 

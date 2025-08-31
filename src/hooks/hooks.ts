@@ -109,10 +109,20 @@ export let useConfigs = (
   }
 
   let reorderConfig = async (serviceKey: string, newIndex: number) => {
+    // Optimistically update the UI immediately
+    let oldIndex = configs.findIndex(config => config.name === serviceKey)
+    if (oldIndex === -1) return
+    
+    let newConfigs = [...configs]
+    let [movedConfig] = newConfigs.splice(oldIndex, 1)
+    newConfigs.splice(newIndex, 0, movedConfig)
+    setConfigs(newConfigs)
+    
     try {
       await invoke("reorder_port_forward_config", { serviceKey, newIndex })
-      await loadConfigs()
     } catch (error) {
+      // Revert on error
+      setConfigs(configs)
       setMessage(`Error reordering config: ${error}`)
     }
   }

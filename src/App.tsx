@@ -10,12 +10,12 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
-} from '@dnd-kit/core'
+} from "@dnd-kit/core"
 import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
+} from "@dnd-kit/sortable"
 import ServiceCard from "./ServiceCard"
 import ServiceSettings from "./components/ServiceSettings"
 import AddConfigForm from "./components/AddConfigForm"
@@ -48,10 +48,10 @@ function App() {
     addConfig,
     removeConfig,
     updateConfig,
-    reorderConfig,
     loadContexts,
     loadNamespaces,
     loadServices,
+    reorderConfig,
     loadPorts,
     stopPortForward,
   } = useConfigs(
@@ -78,33 +78,31 @@ function App() {
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   )
 
   let handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
   }
 
-  let handleDragEnd = async (event: DragEndEvent) => {
+  let handleDragEnd = (event: DragEndEvent) => {
     let { active, over } = event
-    setActiveId(null)
 
     if (active.id !== over?.id) {
-      let oldIndex = configs.findIndex(config => config.name === active.id)
-      let newIndex = configs.findIndex(config => config.name === over?.id)
-      
+      let oldIndex = configs.findIndex((config) => config.name === active.id)
+      let newIndex = configs.findIndex((config) => config.name === over?.id)
+
       if (oldIndex !== -1 && newIndex !== -1) {
         let config = configs[oldIndex]
-        console.log('Reordering:', config.name, 'from', oldIndex, 'to', newIndex)
-        
-        try {
-          await reorderConfig(config.name, newIndex)
-          console.log('Reorder completed successfully')
-        } catch (error) {
-          console.error('Reorder failed:', error)
-        }
+        console.log("Reordering:", config.name, "from", oldIndex, "to", newIndex)
+
+        reorderConfig(config.name, newIndex).catch((error: any) => {
+          console.error("Reorder failed:", error)
+        })
       }
     }
+
+    setActiveId(null)
   }
 
   if (kubectlConfigured === null) {
@@ -136,7 +134,7 @@ function App() {
           onDragEnd={handleDragEnd}
         >
           <SortableContext
-            items={configs.map(config => config.name)}
+            items={configs.map((config) => config.name)}
             strategy={verticalListSortingStrategy}
           >
             {configs.map((config) => {
@@ -160,27 +158,27 @@ function App() {
             })}
           </SortableContext>
           <DragOverlay>
-            {activeId ? (
-              (() => {
-                let config = configs.find(c => c.name === activeId)
-                let service = services.find(s => s.name === activeId)
-                return config ? (
-                  <ServiceCard
-                    id={config.name}
-                    name={config.name}
-                    displayName={`${config.name} (${config.service})`}
-                    context={config.context}
-                    namespace={config.namespace}
-                    ports={`Ports: ${config.ports.join(", ")}`}
-                    isRunning={service?.running || false}
-                    isLoading={loading === config.name}
-                    onStart={() => startPortForward(config.name)}
-                    onStop={() => stopPortForward(config.name)}
-                    onSettings={() => setActiveServiceSettings(config.name)}
-                  />
-                ) : null
-              })()
-            ) : null}
+            {activeId
+              ? (() => {
+                  let config = configs.find((c) => c.name === activeId)
+                  let service = services.find((s) => s.name === activeId)
+                  return config ? (
+                    <ServiceCard
+                      id={config.name}
+                      name={config.name}
+                      displayName={`${config.name} (${config.service})`}
+                      context={config.context}
+                      namespace={config.namespace}
+                      ports={`Ports: ${config.ports.join(", ")}`}
+                      isRunning={service?.running || false}
+                      isLoading={loading === config.name}
+                      onStart={() => startPortForward(config.name)}
+                      onStop={() => stopPortForward(config.name)}
+                      onSettings={() => setActiveServiceSettings(config.name)}
+                    />
+                  ) : null
+                })()
+              : null}
           </DragOverlay>
         </DndContext>
       </div>
