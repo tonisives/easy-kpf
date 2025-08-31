@@ -8,6 +8,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -37,6 +39,7 @@ function App() {
   let [availableNamespaces, setAvailableNamespaces] = useState<string[]>([])
   let [availableServices, setAvailableServices] = useState<string[]>([])
   let [availablePorts, setAvailablePorts] = useState<string[]>([])
+  let [activeId, setActiveId] = useState<string | null>(null)
   let {
     configs,
     services,
@@ -78,8 +81,13 @@ function App() {
     })
   )
 
+  let handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }
+
   let handleDragEnd = async (event: DragEndEvent) => {
     let { active, over } = event
+    setActiveId(null)
 
     if (active.id !== over?.id) {
       let oldIndex = configs.findIndex(config => config.name === active.id)
@@ -124,6 +132,7 @@ function App() {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
           <SortableContext
@@ -150,6 +159,29 @@ function App() {
               )
             })}
           </SortableContext>
+          <DragOverlay>
+            {activeId ? (
+              (() => {
+                let config = configs.find(c => c.name === activeId)
+                let service = services.find(s => s.name === activeId)
+                return config ? (
+                  <ServiceCard
+                    id={config.name}
+                    name={config.name}
+                    displayName={`${config.name} (${config.service})`}
+                    context={config.context}
+                    namespace={config.namespace}
+                    ports={`Ports: ${config.ports.join(", ")}`}
+                    isRunning={service?.running || false}
+                    isLoading={loading === config.name}
+                    onStart={() => startPortForward(config.name)}
+                    onStop={() => stopPortForward(config.name)}
+                    onSettings={() => setActiveServiceSettings(config.name)}
+                  />
+                ) : null
+              })()
+            ) : null}
+          </DragOverlay>
         </DndContext>
       </div>
 
