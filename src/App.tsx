@@ -1,13 +1,16 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { invoke } from "@tauri-apps/api/core"
 import ServiceCard from "./ServiceCard"
 import ServiceSettings from "./components/ServiceSettings"
 import AddConfigForm from "./components/AddConfigForm"
 import EditConfigForm from "./components/EditConfigForm"
+import SetupScreen from "./components/SetupScreen"
 import "./App.css"
 import { PortForwardConfig, useConfigs } from "./hooks/hooks"
 
 function App() {
   let [message, setMessage] = useState("")
+  let [kubectlConfigured, setKubectlConfigured] = useState<boolean | null>(null)
 
   let [showAddForm, setShowAddForm] = useState(false)
   let [activeServiceSettings, setActiveServiceSettings] = useState<string | null>(null)
@@ -40,6 +43,26 @@ function App() {
     setAvailableNamespaces,
     setAvailableServices,
   )
+
+  useEffect(() => {
+    let checkKubectlSetup = async () => {
+      try {
+        let path = await invoke<string | null>("get_kubectl_path")
+        setKubectlConfigured(!!path)
+      } catch {
+        setKubectlConfigured(false)
+      }
+    }
+    checkKubectlSetup()
+  }, [])
+
+  if (kubectlConfigured === null) {
+    return <div style={{ padding: "20px", textAlign: "center" }}>Loading...</div>
+  }
+
+  if (!kubectlConfigured) {
+    return <SetupScreen onSetupComplete={() => setKubectlConfigured(true)} />
+  }
 
   return (
     <main className="container">

@@ -1,3 +1,4 @@
+BUILD.md
 # Logs
 logs
 *.log
@@ -22,3 +23,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+EasyKpf.pkg

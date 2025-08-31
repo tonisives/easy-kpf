@@ -12,45 +12,81 @@ pub struct PortForwardConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct PortForwardConfigs {
+struct AppConfig {
+    kubectl_path: Option<String>,
     configs: Vec<PortForwardConfig>,
 }
 
 fn get_config_dir() -> Result<PathBuf, String> {
     let config_dir = dirs::config_dir()
         .ok_or("Could not find config directory")?
-        .join("easy-kpf");
+        .join("EasyKpf");
 
     fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
     Ok(config_dir)
 }
 
 fn get_config_file_path() -> Result<PathBuf, String> {
-    Ok(get_config_dir()?.join("port-forwards.yaml"))
+    Ok(get_config_dir()?.join("app-config.yaml"))
 }
 
 pub fn load_configs() -> Result<Vec<PortForwardConfig>, String> {
     let config_path = get_config_file_path()?;
 
     if !config_path.exists() {
-        let default_configs = PortForwardConfigs { configs: vec![] };
+        let default_configs = AppConfig {
+            kubectl_path: None,
+            configs: vec![],
+        };
 
         save_configs(&default_configs.configs)?;
         return Ok(default_configs.configs);
     }
 
     let config_content = fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
-    let configs: PortForwardConfigs =
-        serde_yaml::from_str(&config_content).map_err(|e| e.to_string())?;
+    let configs: AppConfig = serde_yaml::from_str(&config_content).map_err(|e| e.to_string())?;
     Ok(configs.configs)
 }
 
-pub fn save_configs(configs: &[PortForwardConfig]) -> Result<(), String> {
+fn load_app_config() -> Result<AppConfig, String> {
     let config_path = get_config_file_path()?;
-    let configs_wrapper = PortForwardConfigs {
-        configs: configs.to_vec(),
-    };
-    let yaml_content = serde_yaml::to_string(&configs_wrapper).map_err(|e| e.to_string())?;
+
+    if !config_path.exists() {
+        let default_config = AppConfig {
+            kubectl_path: None,
+            configs: vec![],
+        };
+        save_app_config(&default_config)?;
+        return Ok(default_config);
+    }
+
+    let config_content = fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
+    let config: AppConfig = serde_yaml::from_str(&config_content).map_err(|e| e.to_string())?;
+    Ok(config)
+}
+
+fn save_app_config(config: &AppConfig) -> Result<(), String> {
+    let config_path = get_config_file_path()?;
+    let yaml_content = serde_yaml::to_string(config).map_err(|e| e.to_string())?;
     fs::write(&config_path, yaml_content).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+pub fn save_configs(configs: &[PortForwardConfig]) -> Result<(), String> {
+    let mut app_config = load_app_config()?;
+    app_config.configs = configs.to_vec();
+    save_app_config(&app_config)
+}
+
+pub fn load_kubectl_path() -> Result<String, String> {
+    let config = load_app_config()?;
+    config
+        .kubectl_path
+        .ok_or_else(|| "kubectl path not configured".to_string())
+}
+
+pub fn save_kubectl_path(path: String) -> Result<(), String> {
+    let mut config = load_app_config()?;
+    config.kubectl_path = Some(path);
+    save_app_config(&config)
 }

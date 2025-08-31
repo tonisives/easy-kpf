@@ -4,15 +4,17 @@ use tauri::State;
 use tauri_plugin_shell::ShellExt;
 
 mod config;
+mod kubectl;
 use config::{load_configs, save_configs, PortForwardConfig};
 
 type ProcessMap = Mutex<HashMap<String, u32>>;
 
 async fn get_current_context(app_handle: &tauri::AppHandle) -> Result<String, String> {
     let shell = app_handle.shell();
+    let kubectl_cmd = kubectl::get_kubectl_command();
 
     let output = shell
-        .command("kubectl")
+        .command(&kubectl_cmd)
         .args(["config", "current-context"])
         .output()
         .await
@@ -53,9 +55,10 @@ async fn set_kubectl_context(
     context: String,
 ) -> Result<String, String> {
     let shell = app_handle.shell();
+    let kubectl_cmd = kubectl::get_kubectl_command();
 
     let output = shell
-        .command("kubectl")
+        .command(&kubectl_cmd)
         .args(["config", "use-context", &context])
         .output()
         .await
@@ -91,8 +94,9 @@ fn remove_port_forward_config(service_key: String) -> Result<(), String> {
 #[tauri::command]
 async fn get_kubectl_contexts(app_handle: tauri::AppHandle) -> Result<Vec<String>, String> {
     let shell = app_handle.shell();
+    let kubectl_cmd = kubectl::get_kubectl_command();
     let output = shell
-        .command("kubectl")
+        .command(&kubectl_cmd)
         .args(["config", "get-contexts", "-o", "name"])
         .output()
         .await
@@ -117,9 +121,10 @@ async fn get_namespaces(
     context: String,
 ) -> Result<Vec<String>, String> {
     let shell = app_handle.shell();
+    let kubectl_cmd = kubectl::get_kubectl_command();
 
     let output = shell
-        .command("kubectl")
+        .command(&kubectl_cmd)
         .args([
             "--context",
             &context,
@@ -151,9 +156,10 @@ async fn get_services(
     namespace: String,
 ) -> Result<Vec<String>, String> {
     let shell = app_handle.shell();
+    let kubectl_cmd = kubectl::get_kubectl_command();
 
     let output = shell
-        .command("kubectl")
+        .command(&kubectl_cmd)
         .args([
             "--context",
             &context,
@@ -188,11 +194,12 @@ async fn get_service_ports(
     service: String,
 ) -> Result<Vec<String>, String> {
     let shell = app_handle.shell();
+    let kubectl_cmd = kubectl::get_kubectl_command();
 
     let service_name = service.strip_prefix("svc/").unwrap_or(&service);
 
     let output = shell
-        .command("kubectl")
+        .command(&kubectl_cmd)
         .args([
             "--context",
             &context,
@@ -260,8 +267,9 @@ async fn start_port_forward_generic(
         let port_refs: Vec<&str> = config.ports.iter().map(|s| s.as_str()).collect();
         args.extend(port_refs);
 
+        let kubectl_cmd = kubectl::get_kubectl_command();
         let (_rx, child) = shell
-            .command("kubectl")
+            .command(&kubectl_cmd)
             .args(args)
             .spawn()
             .map_err(|e| e.to_string())?;
@@ -352,7 +360,11 @@ pub fn run() {
             get_kubectl_contexts,
             get_namespaces,
             get_services,
-            get_service_ports
+            get_service_ports,
+            kubectl::detect_kubectl_path,
+            kubectl::validate_kubectl_path,
+            kubectl::set_kubectl_path,
+            kubectl::get_kubectl_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
