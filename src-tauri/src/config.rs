@@ -5,6 +5,7 @@ use std::path::PathBuf;
 #[derive(Debug, Serialize, Deserialize)]
 struct AppConfig {
     kubectl_path: Option<String>,
+    kubeconfig_path: Option<String>,
 }
 
 fn get_config_dir() -> Result<PathBuf, String> {
@@ -24,7 +25,10 @@ fn load_app_config() -> Result<AppConfig, String> {
     let config_path = get_config_file_path()?;
 
     if !config_path.exists() {
-        let default_config = AppConfig { kubectl_path: None };
+        let default_config = AppConfig {
+            kubectl_path: None,
+            kubeconfig_path: None,
+        };
         save_app_config(&default_config)?;
         return Ok(default_config);
     }
@@ -51,5 +55,16 @@ pub fn load_kubectl_path() -> Result<String, String> {
 pub fn save_kubectl_path(path: String) -> Result<(), String> {
     let mut config = load_app_config()?;
     config.kubectl_path = Some(path);
+    save_app_config(&config)
+}
+
+pub fn load_kubeconfig_path() -> Result<Option<String>, String> {
+    let config = load_app_config()?;
+    Ok(config.kubeconfig_path)
+}
+
+pub fn save_kubeconfig_path(path: String) -> Result<(), String> {
+    let mut config = load_app_config()?;
+    config.kubeconfig_path = Some(path);
     save_app_config(&config)
 }

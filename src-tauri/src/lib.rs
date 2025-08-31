@@ -11,7 +11,12 @@ use port_forwards::{load_configs, save_configs, PortForwardConfig};
 type ProcessMap = Mutex<HashMap<String, u32>>;
 
 fn get_kubeconfig_path() -> Option<String> {
-    // Try to get KUBECONFIG from environment, fallback to default config
+    // First try to get from stored config
+    if let Ok(Some(stored_path)) = config::load_kubeconfig_path() {
+        return Some(stored_path);
+    }
+
+    // Fallback to environment variable
     std::env::var("KUBECONFIG")
         .or_else(|_| {
             // Check if default config exists
@@ -414,8 +419,10 @@ fn set_kubeconfig_env(path: String) -> Result<(), String> {
         return Err("KUBECONFIG file does not exist".to_string());
     }
 
-    // Note: This sets it for the current process, but it won't persist across app restarts
-    // For persistence, the user would need to set it in their shell profile
+    // Save to config file for persistence
+    config::save_kubeconfig_path(path.clone())?;
+
+    // Also set environment variable for current process
     std::env::set_var("KUBECONFIG", &path);
     Ok(())
 }
