@@ -60,13 +60,20 @@ function App() {
   }, [])
 
   let handleDragStart = (index: number) => (e: React.DragEvent<HTMLDivElement>) => {
+    console.log('Drag started:', index)
     setDraggedIndex(index)
     e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData('text/plain', index.toString())
   }
 
   let handleDragOver = (index: number) => (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = "move"
+    
+    if (draggedIndex === null || draggedIndex === index) {
+      return
+    }
+    
     setDragOverIndex(index)
   }
 
@@ -78,9 +85,18 @@ function App() {
     e.preventDefault()
     setDragOverIndex(null)
     
+    console.log('Drop event:', { draggedIndex, targetIndex: index })
+    
     if (draggedIndex !== null && draggedIndex !== index) {
       let config = configs[draggedIndex]
-      await reorderConfig(config.name, index)
+      console.log('Reordering:', config.name, 'from', draggedIndex, 'to', index)
+      
+      try {
+        await reorderConfig(config.name, index)
+        console.log('Reorder completed successfully')
+      } catch (error) {
+        console.error('Reorder failed:', error)
+      }
     }
     
     setDraggedIndex(null)
