@@ -54,6 +54,7 @@ function App() {
     reorderConfig,
     loadPorts,
     stopPortForward,
+    clearServiceError,
   } = useConfigs(
     setMessage,
     setAvailablePorts,
@@ -150,9 +151,11 @@ function App() {
                   ports={`Ports: ${config.ports.join(", ")}`}
                   isRunning={service?.running || false}
                   isLoading={loading === config.name}
+                  error={service?.error}
                   onStart={() => startPortForward(config.name)}
                   onStop={() => stopPortForward(config.name)}
                   onSettings={() => setActiveServiceSettings(config.name)}
+                  onClearError={() => clearServiceError(config.name)}
                 />
               )
             })}
@@ -172,9 +175,11 @@ function App() {
                       ports={`Ports: ${config.ports.join(", ")}`}
                       isRunning={service?.running || false}
                       isLoading={loading === config.name}
+                      error={service?.error}
                       onStart={() => startPortForward(config.name)}
                       onStop={() => stopPortForward(config.name)}
                       onSettings={() => setActiveServiceSettings(config.name)}
+                      onClearError={() => clearServiceError(config.name)}
                     />
                   ) : null
                 })()

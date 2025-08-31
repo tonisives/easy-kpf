@@ -273,6 +273,47 @@ button {
   background-color: rgba(0, 0, 0, 0.1);
 }
 
+.service-error {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.service-error-text {
+  flex: 1;
+  color: #dc2626;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.service-error-close {
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.service-error-close:hover {
+  background-color: rgba(220, 38, 38, 0.1);
+}
+
 .message {
   margin-top: 2rem;
   padding: 1rem;
@@ -819,6 +860,23 @@ button {
 
   .settings-icon-button:hover {
     background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .service-error {
+    background-color: #450a0a;
+    border-color: #7f1d1d;
+  }
+
+  .service-error-text {
+    color: #f87171;
+  }
+
+  .service-error-close {
+    color: #f87171;
+  }
+
+  .service-error-close:hover {
+    background-color: rgba(248, 113, 113, 0.1);
   }
 
   .service-settings-popup {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 export type ServiceStatus = {
   name: string
   running: boolean
+  error?: string
 }
 
 export type PortForwardConfig = {
@@ -56,19 +57,28 @@ export let useConfigs = (
 
   let startPortForward = async (serviceKey: string) => {
     setLoading(serviceKey)
+    setServices((prev) =>
+      prev.map((service) =>
+        service.name === serviceKey ? { ...service, error: undefined } : service,
+      ),
+    )
     try {
       let result: string = await invoke("start_port_forward_by_key", { serviceKey })
-      setMessage(result)
       await updateServiceStatus()
     } catch (error) {
       let errorMessage = `${error}`
-      setMessage(`Error: ${errorMessage}`)
-
+      
       // If error indicates port forwarding is already running, set the service state to running
       if (errorMessage.includes("port forwarding is already running")) {
         setServices((prev) =>
           prev.map((service) =>
-            service.name === serviceKey ? { ...service, running: true } : service,
+            service.name === serviceKey ? { ...service, running: true, error: undefined } : service,
+          ),
+        )
+      } else {
+        setServices((prev) =>
+          prev.map((service) =>
+            service.name === serviceKey ? { ...service, error: errorMessage } : service,
           ),
         )
       }
@@ -179,25 +189,42 @@ export let useConfigs = (
 
   let stopPortForward = async (serviceName: string) => {
     setLoading(serviceName)
+    setServices((prev) =>
+      prev.map((service) =>
+        service.name === serviceName ? { ...service, error: undefined } : service,
+      ),
+    )
     try {
       let result: string = await invoke("stop_port_forward", { serviceName })
-      setMessage(result)
       await updateServiceStatus()
     } catch (error) {
       let errorMessage = `${error}`
-      setMessage(`Error: ${errorMessage}`)
 
       // If error indicates port forwarding is not running, reset the service state to stopped
       if (errorMessage.includes("port forwarding is not running")) {
         setServices((prev) =>
           prev.map((service) =>
-            service.name === serviceName ? { ...service, running: false } : service,
+            service.name === serviceName ? { ...service, running: false, error: undefined } : service,
+          ),
+        )
+      } else {
+        setServices((prev) =>
+          prev.map((service) =>
+            service.name === serviceName ? { ...service, error: errorMessage } : service,
           ),
         )
       }
     } finally {
       setLoading(null)
     }
+  }
+
+  let clearServiceError = (serviceName: string) => {
+    setServices((prev) =>
+      prev.map((service) =>
+        service.name === serviceName ? { ...service, error: undefined } : service,
+      ),
+    )
   }
 
   return {
@@ -216,5 +243,6 @@ export let useConfigs = (
     loadServices,
     loadPorts,
     stopPortForward,
+    clearServiceError,
   }
 }
