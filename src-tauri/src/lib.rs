@@ -5,102 +5,11 @@ use tauri_plugin_shell::ShellExt;
 
 mod config;
 mod kubectl;
+mod kubectl_context;
 mod port_forwards;
 use port_forwards::{load_configs, save_configs, PortForwardConfig};
 
 type ProcessMap = Mutex<HashMap<String, u32>>;
-
-fn get_kubeconfig_path() -> Option<String> {
-    // First try to get from stored config
-    if let Ok(Some(stored_path)) = config::load_kubeconfig_path() {
-        return Some(stored_path);
-    }
-
-    // Fallback to environment variable
-    std::env::var("KUBECONFIG")
-        .or_else(|_| {
-            // Check if default config exists
-            let default_config =
-                format!("{}/.kube/config", std::env::var("HOME").unwrap_or_default());
-            if std::path::Path::new(&default_config).exists() {
-                Ok(default_config)
-            } else {
-                Err(std::env::VarError::NotPresent)
-            }
-        })
-        .ok()
-}
-
-async fn get_current_context(app_handle: &tauri::AppHandle) -> Result<String, String> {
-    let shell = app_handle.shell();
-    let kubectl_cmd = kubectl::get_kubectl_command();
-
-    let mut command = shell.command(&kubectl_cmd);
-    if let Some(kubeconfig) = get_kubeconfig_path() {
-        command = command.env("KUBECONFIG", kubeconfig);
-    }
-
-    let output = command
-        .args(["config", "current-context"])
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        let error = String::from_utf8_lossy(&output.stderr);
-        Err(format_kubectl_error(&error))
-    }
-}
-
-fn format_kubectl_error(error: &str) -> String {
-    let error_lower = error.to_lowercase();
-
-    if error_lower.contains("unable to connect") || error_lower.contains("connection refused") {
-        "⚠️  Unable to connect to cluster. Check your internet connection and cluster status."
-            .to_string()
-    } else if error_lower.contains("unauthorized") || error_lower.contains("forbidden") {
-        "🔐 Authentication failed. For GKE clusters, run: gcloud auth application-default login"
-            .to_string()
-    } else if error_lower.contains("token") && error_lower.contains("expired") {
-        "⏰ Authentication token expired. For GKE clusters, run: gcloud auth application-default login".to_string()
-    } else if error_lower.contains("no cluster") || error_lower.contains("context") {
-        "🚫 No active kubectl context found. Configure kubectl with: kubectl config use-context <context-name>".to_string()
-    } else if error_lower.contains("gke_gcloud_auth_plugin") {
-        "🔧 GKE auth plugin required. Run: gcloud components install gke-gcloud-auth-plugin"
-            .to_string()
-    } else {
-        format!("❌ kubectl error: {}", error)
-    }
-}
-
-#[tauri::command]
-async fn set_kubectl_context(
-    app_handle: tauri::AppHandle,
-    context: String,
-) -> Result<String, String> {
-    let shell = app_handle.shell();
-    let kubectl_cmd = kubectl::get_kubectl_command();
-
-    let mut command = shell.command(&kubectl_cmd);
-    if let Some(kubeconfig) = get_kubeconfig_path() {
-        command = command.env("KUBECONFIG", kubeconfig);
-    }
-
-    let output = command
-        .args(["config", "use-context", &context])
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        let error = String::from_utf8_lossy(&output.stderr);
-        Err(format_kubectl_error(&error))
-    }
-}
 
 #[tauri::command]
 fn get_port_forward_configs() -> Result<Vec<PortForwardConfig>, String> {
@@ -141,35 +50,6 @@ fn reorder_port_forward_config(service_key: String, new_index: usize) -> Result<
 }
 
 #[tauri::command]
-async fn get_kubectl_contexts(app_handle: tauri::AppHandle) -> Result<Vec<String>, String> {
-    let shell = app_handle.shell();
-    let kubectl_cmd = kubectl::get_kubectl_command();
-
-    let mut command = shell.command(&kubectl_cmd);
-    if let Some(kubeconfig) = get_kubeconfig_path() {
-        command = command.env("KUBECONFIG", kubeconfig);
-    }
-
-    let output = command
-        .args(["config", "get-contexts", "-o", "name"])
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if output.status.success() {
-        let contexts = String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-        Ok(contexts)
-    } else {
-        let error = String::from_utf8_lossy(&output.stderr);
-        Err(format_kubectl_error(&error))
-    }
-}
-
-#[tauri::command]
 async fn get_namespaces(
     app_handle: tauri::AppHandle,
     context: String,
@@ -178,7 +58,7 @@ async fn get_namespaces(
     let kubectl_cmd = kubectl::get_kubectl_command();
 
     let mut command = shell.command(&kubectl_cmd);
-    if let Some(kubeconfig) = get_kubeconfig_path() {
+    if let Some(kubeconfig) = kubectl_context::get_kubeconfig_path() {
         command = command.env("KUBECONFIG", kubeconfig);
     }
 
@@ -203,7 +83,7 @@ async fn get_namespaces(
         Ok(namespaces)
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
-        Err(format_kubectl_error(&error))
+        Err(kubectl_context::format_kubectl_error(&error))
     }
 }
 
@@ -217,7 +97,7 @@ async fn get_services(
     let kubectl_cmd = kubectl::get_kubectl_command();
 
     let mut command = shell.command(&kubectl_cmd);
-    if let Some(kubeconfig) = get_kubeconfig_path() {
+    if let Some(kubeconfig) = kubectl_context::get_kubeconfig_path() {
         command = command.env("KUBECONFIG", kubeconfig);
     }
 
@@ -244,7 +124,7 @@ async fn get_services(
         Ok(services)
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
-        Err(format_kubectl_error(&error))
+        Err(kubectl_context::format_kubectl_error(&error))
     }
 }
 
@@ -261,7 +141,7 @@ async fn get_service_ports(
     let service_name = service.strip_prefix("svc/").unwrap_or(&service);
 
     let mut command = shell.command(&kubectl_cmd);
-    if let Some(kubeconfig) = get_kubeconfig_path() {
+    if let Some(kubeconfig) = kubectl_context::get_kubeconfig_path() {
         command = command.env("KUBECONFIG", kubeconfig);
     }
 
@@ -289,7 +169,7 @@ async fn get_service_ports(
         Ok(ports)
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
-        Err(format_kubectl_error(&error))
+        Err(kubectl_context::format_kubectl_error(&error))
     }
 }
 
@@ -325,8 +205,8 @@ async fn start_port_forward_generic(
         }
     }
 
-    let current_context = get_current_context(&app_handle).await?;
-    set_kubectl_context(app_handle.clone(), config.context.clone()).await?;
+    let current_context = kubectl_context::get_current_context(&app_handle).await?;
+    kubectl_context::set_kubectl_context(app_handle.clone(), config.context.clone()).await?;
 
     let result = async {
         let mut args = vec!["-n", &config.namespace, "port-forward", &config.service];
@@ -355,7 +235,9 @@ async fn start_port_forward_generic(
     }
     .await;
 
-    set_kubectl_context(app_handle, current_context).await.ok();
+    kubectl_context::set_kubectl_context(app_handle, current_context)
+        .await
+        .ok();
 
     result
 }
@@ -408,25 +290,6 @@ fn get_running_services(process_map: State<'_, ProcessMap>) -> Vec<String> {
     map.keys().cloned().collect()
 }
 
-#[tauri::command]
-fn get_kubeconfig_env() -> Option<String> {
-    get_kubeconfig_path()
-}
-
-#[tauri::command]
-fn set_kubeconfig_env(path: String) -> Result<(), String> {
-    if !std::path::Path::new(&path).exists() {
-        return Err("KUBECONFIG file does not exist".to_string());
-    }
-
-    // Save to config file for persistence
-    config::save_kubeconfig_path(path.clone())?;
-
-    // Also set environment variable for current process
-    std::env::set_var("KUBECONFIG", &path);
-    Ok(())
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let process_map: ProcessMap = Mutex::new(HashMap::new());
@@ -436,7 +299,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .manage(process_map)
         .invoke_handler(tauri::generate_handler![
-            set_kubectl_context,
+            kubectl_context::set_kubectl_context,
             start_port_forward_by_key,
             stop_port_forward,
             get_running_services,
@@ -444,12 +307,12 @@ pub fn run() {
             add_port_forward_config,
             remove_port_forward_config,
             reorder_port_forward_config,
-            get_kubectl_contexts,
+            kubectl_context::get_kubectl_contexts,
             get_namespaces,
             get_services,
             get_service_ports,
-            get_kubeconfig_env,
-            set_kubeconfig_env,
+            kubectl_context::get_kubeconfig_env,
+            kubectl_context::set_kubeconfig_env,
             kubectl::detect_kubectl_path,
             kubectl::validate_kubectl_path,
             kubectl::set_kubectl_path,

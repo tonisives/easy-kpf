@@ -317,4 +317,3 @@ let SetupScreen = ({ onSetupComplete }: SetupScreenProps) => {
 }
 
 export default SetupScreen
-
