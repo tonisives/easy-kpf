@@ -98,10 +98,14 @@ function App() {
   }
 
   if (!kubectlConfigured || showSettings) {
-    return <SetupScreen onSetupComplete={() => {
-      setKubectlConfigured(true)
-      setShowSettings(false)
-    }} />
+    return <SetupScreen 
+      onSetupComplete={() => {
+        setKubectlConfigured(true)
+        setShowSettings(false)
+      }}
+      onCancel={showSettings ? () => setShowSettings(false) : undefined}
+      isDialog={showSettings}
+    />
   }
 
   return (
