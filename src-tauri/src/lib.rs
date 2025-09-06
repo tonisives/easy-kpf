@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{Manager, State};
 use tauri_plugin_shell::ShellExt;
 
 mod config;
@@ -317,6 +317,22 @@ fn get_running_services(process_map: State<'_, ProcessMap>) -> Vec<String> {
     map.keys().cloned().collect()
 }
 
+fn cleanup_all_port_forwards(process_map: &ProcessMap) -> Result<(), String> {
+    let mut map = process_map.lock().unwrap();
+    let pids: Vec<u32> = map.values().cloned().collect();
+    map.clear();
+
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+        for pid in pids {
+            let _ = Command::new("kill").arg(pid.to_string()).output();
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let process_map: ProcessMap = Mutex::new(HashMap::new());
@@ -346,6 +362,12 @@ pub fn run() {
             kubectl::set_kubectl_path,
             kubectl::get_kubectl_path
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                let process_map = app_handle.state::<ProcessMap>();
+                let _ = cleanup_all_port_forwards(&process_map);
+            }
+        });
 }
