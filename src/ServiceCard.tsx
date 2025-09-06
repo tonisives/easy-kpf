@@ -1,5 +1,5 @@
-import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 type ServiceCardProps = {
   id: string
@@ -31,43 +31,23 @@ let ServiceCard = ({
   onSettings,
   onClearError,
 }: ServiceCardProps) => {
-  let {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id })
+  let { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
 
   let style = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging ? 'none' : transition || 'transform 200ms ease',
+    transition: isDragging ? "none" : transition || "transform 200ms ease",
     opacity: isDragging ? 0.5 : 1,
   }
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="service-group"
-    >
+    <div ref={setNodeRef} style={style} className="service-group">
       <div className="service-header">
-        <div
-          className="drag-handle"
-          title="Drag to reorder"
-          {...attributes}
-          {...listeners}
-        >
+        <div className="drag-handle" title="Drag to reorder" {...attributes} {...listeners}>
           ⋮⋮
         </div>
         <div className="service-info">
           <div style={{ display: "flex", gap: "10px" }}>
             <h3>{displayName}</h3>
-
-            <span className={`status ${isRunning ? "running" : "stopped"}`}>
-              {isRunning ? "● Running" : "● Stopped"}
-            </span>
           </div>
           <p>
             Context: {context} | Namespace: {namespace} | {ports}
@@ -88,15 +68,11 @@ let ServiceCard = ({
           </button>
         </div>
       </div>
-      
+
       {error && (
         <div className="service-error">
           <span className="service-error-text">{error}</span>
-          <button 
-            onClick={onClearError} 
-            className="service-error-close"
-            title="Clear error"
-          >
+          <button onClick={onClearError} className="service-error-close" title="Clear error">
             ×
           </button>
         </div>
@@ -106,4 +82,3 @@ let ServiceCard = ({
 }
 
 export default ServiceCard
-

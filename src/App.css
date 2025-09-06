@@ -204,20 +204,6 @@ button {
   flex-shrink: 0;
 }
 
-.status {
-  font-weight: 500;
-  font-size: 0.9rem;
-  white-space: nowrap;
-}
-
-.status.running {
-  color: #22c55e;
-}
-
-.status.stopped {
-  color: #ef4444;
-}
-
 .start-button {
   background-color: #22c55e;
   color: white;
