@@ -53,6 +53,7 @@ jobs:
         uses: pnpm/action-setup@v4
 
       - name: Update version if release starts with 'v'
+        shell: bash
         run: |
           TAG_NAME="${{ github.ref_name }}"
           echo "Release tag: $TAG_NAME"
