@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "easy-kpf",
+  "productName": "EasyKpf",
   "version": "0.1.0",
   "identifier": "com.tonisives.easy-kpf",
   "build": {
@@ -39,7 +39,10 @@
     ],
     "macOS": {
       "entitlements": "entitlements.plist",
-      "minimumSystemVersion": "10.13"
+      "minimumSystemVersion": "10.13",
+      "signingIdentity": "-",
+      "providerShortName": null,
+      "hardenedRuntime": true
     }
   }
 }

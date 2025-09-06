@@ -52,13 +52,56 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
+      - name: Update version if release starts with 'v'
+        shell: bash
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          echo "Release tag: $TAG_NAME"
+          
+          if [[ "$TAG_NAME" =~ ^v ]]; then
+            # Extract version by removing first character (v)
+            VERSION="${TAG_NAME:1}"
+            echo "Extracted version: $VERSION"
+            
+            # Update package.json
+            pnpm version --no-git-tag-version "$VERSION"
+            
+            # Update Cargo.toml
+            sed -i.bak "s/^version = .*/version = \"$VERSION\"/" src-tauri/Cargo.toml
+            rm -f src-tauri/Cargo.toml.bak
+            
+            echo "Updated versions to: $VERSION"
+            
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add package.json src-tauri/Cargo.toml
+            git commit -m "chore: update version to $VERSION" || true
+            git push origin HEAD || true
+            echo "Committed version changes for v-prefixed release"
+          else
+            echo "Tag doesn't start with 'v', skipping version update"
+          fi
+
       - name: Install frontend dependencies
         run: pnpm install
+
+      - name: Import Code-Signing Certificates (macOS)
+        if: matrix.platform == 'macos-latest'
+        uses: Apple-Actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'EasyKpf v__VERSION__'
