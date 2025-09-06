@@ -4,82 +4,82 @@ use tauri::State;
 
 #[tauri::command]
 pub fn get_port_forward_configs(
-    port_forward_service: State<'_, PortForwardService>,
+  port_forward_service: State<'_, PortForwardService>,
 ) -> Result<Vec<PortForwardConfig>, String> {
-    port_forward_service
-        .get_configs()
-        .map_err(|e| e.to_string())
+  port_forward_service
+    .get_configs()
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn add_port_forward_config(
-    config: PortForwardConfig,
-    port_forward_service: State<'_, PortForwardService>,
+  config: PortForwardConfig,
+  port_forward_service: State<'_, PortForwardService>,
 ) -> Result<(), String> {
-    port_forward_service
-        .add_config(config)
-        .map_err(|e| e.to_string())
+  port_forward_service
+    .add_config(config)
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn remove_port_forward_config(
-    service_key: String,
-    port_forward_service: State<'_, PortForwardService>,
+  service_key: String,
+  port_forward_service: State<'_, PortForwardService>,
 ) -> Result<(), String> {
-    port_forward_service
-        .remove_config(&service_key)
-        .map_err(|e| e.to_string())
+  port_forward_service
+    .remove_config(&service_key)
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn update_port_forward_config(
-    old_service_key: String,
-    new_config: PortForwardConfig,
-    port_forward_service: State<'_, PortForwardService>,
+  old_service_key: String,
+  new_config: PortForwardConfig,
+  port_forward_service: State<'_, PortForwardService>,
 ) -> Result<(), String> {
-    port_forward_service
-        .update_config(&old_service_key, new_config)
-        .map_err(|e| e.to_string())
+  port_forward_service
+    .update_config(&old_service_key, new_config)
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn reorder_port_forward_config(
-    service_key: String,
-    new_index: usize,
-    port_forward_service: State<'_, PortForwardService>,
+  service_key: String,
+  new_index: usize,
+  port_forward_service: State<'_, PortForwardService>,
 ) -> Result<(), String> {
-    port_forward_service
-        .reorder_config(&service_key, new_index)
-        .map_err(|e| e.to_string())
+  port_forward_service
+    .reorder_config(&service_key, new_index)
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn start_port_forward_by_key(
-    service_key: String,
-    port_forward_service: State<'_, PortForwardService>,
-    kubectl_service: State<'_, KubectlService>,
+  service_key: String,
+  port_forward_service: State<'_, PortForwardService>,
+  kubectl_service: State<'_, KubectlService>,
 ) -> Result<String, String> {
-    port_forward_service
-        .start_port_forward_by_key(kubectl_service.inner(), &service_key)
-        .await
-        .map_err(|e| e.to_string())
+  port_forward_service
+    .start_port_forward_by_key(kubectl_service.inner(), &service_key)
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn stop_port_forward(
-    service_name: String,
-    port_forward_service: State<'_, PortForwardService>,
+  service_name: String,
+  port_forward_service: State<'_, PortForwardService>,
 ) -> Result<String, String> {
-    port_forward_service
-        .stop_port_forward(&service_name)
-        .map_err(|e| e.to_string())
+  port_forward_service
+    .stop_port_forward(&service_name)
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn get_running_services(
-    port_forward_service: State<'_, PortForwardService>,
+  port_forward_service: State<'_, PortForwardService>,
 ) -> Result<Vec<String>, String> {
-    port_forward_service
-        .get_running_services()
-        .map_err(|e| e.to_string())
+  port_forward_service
+    .get_running_services()
+    .map_err(|e| e.to_string())
 }
