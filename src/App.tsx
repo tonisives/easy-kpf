@@ -35,10 +35,6 @@ function App() {
     config: PortForwardConfig
     index: number
   } | null>(null)
-  let [availableContexts, setAvailableContexts] = useState<string[]>([])
-  let [availableNamespaces, setAvailableNamespaces] = useState<string[]>([])
-  let [availableServices, setAvailableServices] = useState<string[]>([])
-  let [availablePorts, setAvailablePorts] = useState<string[]>([])
   let [activeId, setActiveId] = useState<string | null>(null)
   let {
     configs,
@@ -49,21 +45,11 @@ function App() {
     addConfig,
     removeConfig,
     updateConfig,
-    loadContexts,
-    loadNamespaces,
-    loadServices,
     reorderConfig,
-    loadPorts,
     stopPortForward,
     clearServiceError,
     clearFormError,
-  } = useConfigs(
-    setMessage,
-    setAvailablePorts,
-    setAvailableContexts,
-    setAvailableNamespaces,
-    setAvailableServices,
-  )
+  } = useConfigs(setMessage, () => {}, () => {}, () => {}, () => {})
 
   useEffect(() => {
     let checkKubectlSetup = async () => {
@@ -197,29 +183,11 @@ function App() {
 
       {showAddForm && (
         <AddConfigForm
-          onAdd={(config) => {
-            addConfig(config)
-            setAvailableContexts([])
-            setAvailableNamespaces([])
-            setAvailableServices([])
-            setAvailablePorts([])
-          }}
+          onAdd={addConfig}
           onClose={() => {
             setShowAddForm(false)
-            setAvailableContexts([])
-            setAvailableNamespaces([])
-            setAvailableServices([])
-            setAvailablePorts([])
             clearFormError()
           }}
-          loadContexts={loadContexts}
-          loadNamespaces={loadNamespaces}
-          loadServices={loadServices}
-          loadPorts={loadPorts}
-          availableContexts={availableContexts}
-          availableNamespaces={availableNamespaces}
-          availableServices={availableServices}
-          availablePorts={availablePorts}
           error={formError}
           onClearError={clearFormError}
         />
@@ -247,20 +215,8 @@ function App() {
           onClose={() => {
             setShowConfigForm(false)
             setEditingConfig(null)
-            setAvailableContexts([])
-            setAvailableNamespaces([])
-            setAvailableServices([])
-            setAvailablePorts([])
             clearFormError()
           }}
-          loadContexts={loadContexts}
-          loadNamespaces={loadNamespaces}
-          loadServices={loadServices}
-          loadPorts={loadPorts}
-          availableContexts={availableContexts}
-          availableNamespaces={availableNamespaces}
-          availableServices={availableServices}
-          availablePorts={availablePorts}
           error={formError}
           onClearError={clearFormError}
         />

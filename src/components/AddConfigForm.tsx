@@ -1,18 +1,15 @@
-import { useState, useEffect } from "react"
 import { PortForwardConfig } from "../hooks/hooks"
+import { useKubernetesDataFlow } from "../hooks/useKubernetesDataFlow"
+import { useFormState } from "../hooks/useFormState"
+import { KubernetesSelect } from "./KubernetesSelect"
+import { PortSuggestions } from "./PortSuggestions"
+import { ErrorBanner } from "./ErrorBanner"
+import { FormActions } from "./FormActions"
 
 type AddConfigFormProps = {
   onAdd: (config: PortForwardConfig) => void
   onUpdate?: (oldName: string, newConfig: PortForwardConfig) => void
   onClose: () => void
-  loadContexts: () => Promise<void>
-  loadNamespaces: (context: string) => Promise<void>
-  loadServices: (context: string, namespace: string) => Promise<void>
-  loadPorts: (context: string, namespace: string, service: string) => Promise<void>
-  availableContexts: string[]
-  availableNamespaces: string[]
-  availableServices: string[]
-  availablePorts: string[]
   error?: string
   onClearError: () => void
   editingConfig?: {
@@ -25,369 +22,115 @@ let AddConfigForm = ({
   onAdd,
   onUpdate,
   onClose,
-  loadContexts,
-  loadNamespaces,
-  loadServices,
-  loadPorts,
-  availableContexts,
-  availableNamespaces,
-  availableServices,
-  availablePorts,
   error,
   onClearError,
   editingConfig,
 }: AddConfigFormProps) => {
-  let [selectedContext, setSelectedContext] = useState(editingConfig?.config.context || "")
-  let [selectedNamespace, setSelectedNamespace] = useState(editingConfig?.config.namespace || "")
-  let [selectedService, setSelectedService] = useState(editingConfig?.config.service || "")
-  let [loadingContexts, setLoadingContexts] = useState(false)
-  let [loadingNamespaces, setLoadingNamespaces] = useState(false)
-  let [loadingServices, setLoadingServices] = useState(false)
-  let [loadingPorts, setLoadingPorts] = useState(false)
+  let kubernetesData = useKubernetesDataFlow({
+    setError: onClearError,
+    editingConfig,
+  })
 
-  // Auto-load contexts on mount
-  useEffect(() => {
-    let loadData = async () => {
-      setLoadingContexts(true)
-      try {
-        await loadContexts()
-      } finally {
-        setLoadingContexts(false)
-      }
-    }
-    loadData()
-  }, [])
+  let formState = useFormState({
+    onAdd,
+    onUpdate,
+    onClose,
+    editingConfig,
+  })
 
-  // Auto-load namespaces when context changes
-  useEffect(() => {
-    if (selectedContext) {
-      let loadData = async () => {
-        setLoadingNamespaces(true)
-        try {
-          await loadNamespaces(selectedContext)
-        } finally {
-          setLoadingNamespaces(false)
-        }
-      }
-      if (!editingConfig) {
-        setSelectedNamespace("")
-        setSelectedService("")
-      }
-      loadData()
-    }
-  }, [selectedContext])
+  let {
+    selectedContext,
+    selectedNamespace,
+    selectedService,
+    setSelectedContext,
+    setSelectedNamespace,
+    setSelectedService,
+    contexts,
+    namespaces,
+    services,
+    ports,
+  } = kubernetesData
 
-  // Auto-load namespaces for editing mode when contexts are available
-  useEffect(() => {
-    if (editingConfig && selectedContext && availableContexts.length > 0 && !loadingContexts) {
-      let loadData = async () => {
-        setLoadingNamespaces(true)
-        try {
-          await loadNamespaces(selectedContext)
-        } finally {
-          setLoadingNamespaces(false)
-        }
-      }
-      loadData()
-    }
-  }, [editingConfig, availableContexts, loadingContexts])
-
-  // Auto-select first available namespace when namespaces load
-  useEffect(() => {
-    if (availableNamespaces.length > 0 && !selectedNamespace && !loadingNamespaces) {
-      setSelectedNamespace(availableNamespaces[0])
-    }
-  }, [availableNamespaces, loadingNamespaces])
-
-  // Auto-load services when namespace changes
-  useEffect(() => {
-    if (selectedContext && selectedNamespace) {
-      let loadData = async () => {
-        setLoadingServices(true)
-        try {
-          await loadServices(selectedContext, selectedNamespace)
-        } finally {
-          setLoadingServices(false)
-        }
-      }
-      if (!editingConfig) {
-        setSelectedService("")
-      }
-      loadData()
-    }
-  }, [selectedNamespace])
-
-  // Auto-load services for editing mode when namespaces are available
-  useEffect(() => {
-    if (editingConfig && selectedContext && selectedNamespace && availableNamespaces.length > 0 && !loadingNamespaces) {
-      let loadData = async () => {
-        setLoadingServices(true)
-        try {
-          await loadServices(selectedContext, selectedNamespace)
-        } finally {
-          setLoadingServices(false)
-        }
-      }
-      loadData()
-    }
-  }, [editingConfig, availableNamespaces, loadingNamespaces, selectedNamespace])
-
-  // Auto-select first available service when services load
-  useEffect(() => {
-    if (availableServices.length > 0 && !selectedService && !loadingServices) {
-      setSelectedService(availableServices[0])
-    }
-  }, [availableServices, loadingServices])
-
-  // Auto-load ports when service changes
-  useEffect(() => {
-    if (selectedContext && selectedNamespace && selectedService) {
-      let loadData = async () => {
-        setLoadingPorts(true)
-        try {
-          await loadPorts(selectedContext, selectedNamespace, selectedService)
-        } finally {
-          setLoadingPorts(false)
-        }
-      }
-      loadData()
-    }
-  }, [selectedService])
-
-  // Auto-load ports for editing mode when services are available
-  useEffect(() => {
-    if (editingConfig && selectedContext && selectedNamespace && selectedService && availableServices.length > 0 && !loadingServices) {
-      let loadData = async () => {
-        setLoadingPorts(true)
-        try {
-          await loadPorts(selectedContext, selectedNamespace, selectedService)
-        } finally {
-          setLoadingPorts(false)
-        }
-      }
-      loadData()
-    }
-  }, [editingConfig, availableServices, loadingServices, selectedService])
-
-  let handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    let formData = new FormData(e.target as HTMLFormElement)
-    let portsString = formData.get("ports") as string
-    let ports = portsString
-      .split(",")
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0)
-
-    let config: PortForwardConfig = {
-      name: formData.get("name") as string,
-      context: selectedContext,
-      namespace: selectedNamespace,
-      service: selectedService,
-      ports: ports,
-    }
-
-    if (editingConfig && onUpdate) {
-      onUpdate(editingConfig.config.name, config)
-    } else {
-      onAdd(config)
-    }
-    onClose()
-  }
-
-  let handleCancel = () => {
-    setSelectedContext("")
-    setSelectedNamespace("")
-    setSelectedService("")
-    onClose()
-  }
+  let { handleCancel, isEditing, defaultValues } = formState
+  let handleFormSubmit = formState.handleSubmit(selectedContext, selectedNamespace, selectedService)
 
   return (
     <div className="add-form-modal">
       <div className="add-form">
-        <h3>{editingConfig ? "Edit Port Forward Configuration" : "Add New Port Forward Configuration"}</h3>
+        <h3>{isEditing ? "Edit Port Forward Configuration" : "Add New Port Forward Configuration"}</h3>
         
-        {error && (
-          <div className="form-error">
-            <span className="form-error-text">{error}</span>
-            <button 
-              type="button"
-              onClick={onClearError} 
-              className="form-error-close"
-              title="Clear error"
-            >
-              ×
-            </button>
-          </div>
-        )}
+        <ErrorBanner error={error} onClearError={onClearError} />
         
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleFormSubmit}>
           <div className="form-group">
             <label>Name:</label>
             <input
               type="text"
               name="name"
-              defaultValue={editingConfig?.config.name || ""}
+              defaultValue={defaultValues.name}
               placeholder="Custom name for this configuration"
               required
             />
             <small>A friendly name to identify this port forward</small>
           </div>
-          <div className="form-group">
-            <label>Context:</label>
-            <select
-              value={selectedContext}
-              onChange={(e) => setSelectedContext(e.target.value)}
-              disabled={loadingContexts}
-              required
-            >
-              <option value="">{loadingContexts ? "Loading contexts..." : "Select context..."}</option>
-              {(() => {
-                let allContexts = [...availableContexts]
-                let originalContext = editingConfig?.config.context
-                
-                // Add original context if it's not in available contexts (unavailable)
-                if (originalContext && !availableContexts.includes(originalContext)) {
-                  allContexts.unshift(originalContext)
-                }
-                
-                return allContexts.map((ctx) => {
-                  let isUnavailable = originalContext && ctx === originalContext && !availableContexts.includes(ctx)
-                  return (
-                    <option 
-                      key={ctx} 
-                      value={ctx}
-                      style={{ 
-                        color: isUnavailable ? '#888' : 'inherit',
-                        fontStyle: isUnavailable ? 'italic' : 'normal'
-                      }}
-                    >
-                      {ctx}{isUnavailable ? ' (unavailable)' : ''}
-                    </option>
-                  )
-                })
-              })()}
-            </select>
-            {loadingContexts && <div className="loading-bar"><div className="loading-progress"></div></div>}
-          </div>
-          <div className="form-group">
-            <label>Namespace:</label>
-            <select
-              value={selectedNamespace}
-              onChange={(e) => setSelectedNamespace(e.target.value)}
-              disabled={!selectedContext || loadingNamespaces}
-              required
-              style={{ opacity: !selectedContext || loadingNamespaces ? 0.6 : 1 }}
-            >
-              <option value="">{loadingNamespaces ? "Loading namespaces..." : "Select namespace..."}</option>
-              {(() => {
-                let allNamespaces = [...availableNamespaces]
-                let originalNamespace = editingConfig?.config.namespace
-                
-                // Add original namespace if it's not in available namespaces (unavailable)
-                if (originalNamespace && !availableNamespaces.includes(originalNamespace)) {
-                  allNamespaces.unshift(originalNamespace)
-                }
-                
-                return allNamespaces.map((ns) => {
-                  let isUnavailable = originalNamespace && ns === originalNamespace && !availableNamespaces.includes(ns)
-                  return (
-                    <option 
-                      key={ns} 
-                      value={ns}
-                      style={{ 
-                        color: isUnavailable ? '#888' : 'inherit',
-                        fontStyle: isUnavailable ? 'italic' : 'normal'
-                      }}
-                    >
-                      {ns}{isUnavailable ? ' (unavailable)' : ''}
-                    </option>
-                  )
-                })
-              })()}
-            </select>
-            {loadingNamespaces && <div className="loading-bar"><div className="loading-progress"></div></div>}
-          </div>
-          <div className="form-group">
-            <label>Service:</label>
-            <select
-              value={selectedService}
-              onChange={(e) => setSelectedService(e.target.value)}
-              disabled={!selectedContext || !selectedNamespace || loadingServices}
-              required
-              style={{ opacity: !selectedContext || !selectedNamespace || loadingServices ? 0.6 : 1 }}
-            >
-              <option value="">{loadingServices ? "Loading services..." : "Select service..."}</option>
-              {(() => {
-                let allServices = [...availableServices]
-                let originalService = editingConfig?.config.service
-                
-                // Add original service if it's not in available services (unavailable)
-                if (originalService && !availableServices.includes(originalService)) {
-                  allServices.unshift(originalService)
-                }
-                
-                return allServices.map((svc) => {
-                  let isUnavailable = originalService && svc === originalService && !availableServices.includes(svc)
-                  return (
-                    <option 
-                      key={svc} 
-                      value={svc}
-                      style={{ 
-                        color: isUnavailable ? '#888' : 'inherit',
-                        fontStyle: isUnavailable ? 'italic' : 'normal'
-                      }}
-                    >
-                      {svc}{isUnavailable ? ' (unavailable)' : ''}
-                    </option>
-                  )
-                })
-              })()}
-            </select>
-            {loadingServices && <div className="loading-bar"><div className="loading-progress"></div></div>}
-          </div>
+
+          <KubernetesSelect
+            label="Context"
+            name="context"
+            value={selectedContext}
+            onChange={setSelectedContext}
+            options={contexts.data}
+            loading={contexts.loading}
+            required
+            loadingText="Loading contexts..."
+            placeholderText="Select context..."
+            editingConfig={editingConfig}
+            originalValueKey="context"
+          />
+
+          <KubernetesSelect
+            label="Namespace"
+            name="namespace"
+            value={selectedNamespace}
+            onChange={setSelectedNamespace}
+            options={namespaces.data}
+            loading={namespaces.loading}
+            disabled={!selectedContext}
+            required
+            loadingText="Loading namespaces..."
+            placeholderText="Select namespace..."
+            editingConfig={editingConfig}
+            originalValueKey="namespace"
+          />
+
+          <KubernetesSelect
+            label="Service"
+            name="service"
+            value={selectedService}
+            onChange={setSelectedService}
+            options={services.data}
+            loading={services.loading}
+            disabled={!selectedContext || !selectedNamespace}
+            required
+            loadingText="Loading services..."
+            placeholderText="Select service..."
+            editingConfig={editingConfig}
+            originalValueKey="service"
+          />
           <div className="form-group">
             <label>Ports:</label>
-            {loadingPorts && <div className="loading-bar"><div className="loading-progress"></div></div>}
-            {availablePorts.length > 0 && !loadingPorts && (
-              <div className="suggested-ports">
-                <small>Detected ports (click to use):</small>
-                <div className="port-suggestions">
-                  {availablePorts.map((port) => (
-                    <button
-                      key={port}
-                      type="button"
-                      className="port-suggestion"
-                      onClick={() => {
-                        let portsInput = document.querySelector(
-                          'input[name="ports"]',
-                        ) as HTMLInputElement
-                        if (portsInput) {
-                          let current = portsInput.value.trim()
-                          portsInput.value = current ? `${current}, ${port}` : port
-                        }
-                      }}
-                    >
-                      {port}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <PortSuggestions ports={ports.data} loading={ports.loading} />
             <input 
               type="text" 
               name="ports" 
-              defaultValue={editingConfig?.config.ports.join(", ") || ""}
+              defaultValue={defaultValues.ports}
               placeholder="e.g., 8080:80, 9090:3000" 
               required 
             />
             <small>Comma-separated list of local:remote ports</small>
           </div>
-          <div className="form-actions">
-            <button type="submit">{editingConfig ? "Update Configuration" : "Add Configuration"}</button>
-            <button type="button" onClick={handleCancel}>
-              Cancel
-            </button>
-          </div>
+
+          <FormActions isEditing={isEditing} onCancel={handleCancel} />
         </form>
       </div>
     </div>
