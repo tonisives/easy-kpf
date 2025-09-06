@@ -242,7 +242,7 @@ async fn start_port_forward_generic(
 
         let kubectl_cmd = kubectl::get_kubectl_command();
         let mut command = shell.command(&kubectl_cmd);
-        if let Ok(kubeconfig) = std::env::var("KUBECONFIG") {
+        if let Some(kubeconfig) = kubectl_context::get_kubeconfig_path() {
             command = command.env("KUBECONFIG", kubeconfig);
         }
 
