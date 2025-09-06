@@ -11,6 +11,7 @@ A desktop application for managing Kubernetes port forwarding with a clean inter
 - Drag and drop interface for organizing forwards
 - Real-time status monitoring
 - Persistent configuration storage
+- Fast app with small bundle size (13MB)
 
 ![Configuration](etc/images/appstore_screenshots/two_1280x800.png)
 
@@ -24,6 +25,8 @@ A desktop application for managing Kubernetes port forwarding with a clean inter
 ## Installation
 
 Built with Tauri (Rust + React). Cross-platform support for macOS, Windows, and Linux.
+
+Download the latest build from [Releases](https://github.com/tonisives/easy-kpf/releases), or build yourself!
 
 ## Development
 
