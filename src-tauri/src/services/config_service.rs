@@ -12,7 +12,7 @@ impl ConfigService {
   pub fn new() -> Result<Self> {
     let config_dir = dirs::config_dir()
       .ok_or_else(|| AppError::Config("Could not find config directory".to_string()))?
-      .join("EasyKpf");
+      .join("easy-kpf");
 
     fs::create_dir_all(&config_dir)?;
 

@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "EasyKpf",
+        "title": "easy-kpf",
         "width": 800,
         "height": 600
       }
