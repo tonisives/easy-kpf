@@ -19,7 +19,6 @@ import {
 import ServiceCard from "./ServiceCard"
 import ServiceSettings from "./components/ServiceSettings"
 import AddConfigForm from "./components/AddConfigForm"
-import EditConfigForm from "./components/EditConfigForm"
 import SetupScreen from "./components/SetupScreen"
 import "./App.css"
 import { PortForwardConfig, useConfigs } from "./hooks/hooks"
@@ -237,17 +236,35 @@ function App() {
         configs={configs}
       />
 
-      <EditConfigForm
-        editingConfig={editingConfig}
-        onUpdate={(oldName, newConfig) => {
-          updateConfig(oldName, newConfig)
-          setEditingConfig(null)
-        }}
-        onClose={() => {
-          setShowConfigForm(false)
-          setEditingConfig(null)
-        }}
-      />
+      {editingConfig && (
+        <AddConfigForm
+          editingConfig={editingConfig}
+          onAdd={() => {}}
+          onUpdate={(oldName, newConfig) => {
+            updateConfig(oldName, newConfig)
+            setEditingConfig(null)
+          }}
+          onClose={() => {
+            setShowConfigForm(false)
+            setEditingConfig(null)
+            setAvailableContexts([])
+            setAvailableNamespaces([])
+            setAvailableServices([])
+            setAvailablePorts([])
+            clearFormError()
+          }}
+          loadContexts={loadContexts}
+          loadNamespaces={loadNamespaces}
+          loadServices={loadServices}
+          loadPorts={loadPorts}
+          availableContexts={availableContexts}
+          availableNamespaces={availableNamespaces}
+          availableServices={availableServices}
+          availablePorts={availablePorts}
+          error={formError}
+          onClearError={clearFormError}
+        />
+      )}
 
       {message && (
         <div className="message">

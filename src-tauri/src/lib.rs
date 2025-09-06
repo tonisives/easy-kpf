@@ -31,6 +31,33 @@ fn remove_port_forward_config(service_key: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn update_port_forward_config(
+    old_service_key: String,
+    new_config: PortForwardConfig,
+    process_map: State<'_, ProcessMap>,
+) -> Result<(), String> {
+    let mut configs = load_configs()?;
+
+    let current_index = configs
+        .iter()
+        .position(|c| c.name == old_service_key)
+        .ok_or_else(|| format!("Configuration not found for service: {}", old_service_key))?;
+
+    // If the service name changed, we need to update the process map
+    if old_service_key != new_config.name {
+        let mut map = process_map.lock().unwrap();
+        if let Some(pid) = map.remove(&old_service_key) {
+            map.insert(new_config.name.clone(), pid);
+        }
+    }
+
+    // Replace the config at the same position
+    configs[current_index] = new_config;
+
+    save_configs(&configs)
+}
+
+#[tauri::command]
 fn reorder_port_forward_config(service_key: String, new_index: usize) -> Result<(), String> {
     let mut configs = load_configs()?;
 
@@ -305,6 +332,7 @@ pub fn run() {
             get_running_services,
             get_port_forward_configs,
             add_port_forward_config,
+            update_port_forward_config,
             remove_port_forward_config,
             reorder_port_forward_config,
             kubectl_context::get_kubectl_contexts,

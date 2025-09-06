@@ -3,6 +3,7 @@ import { PortForwardConfig } from "../hooks/hooks"
 
 type AddConfigFormProps = {
   onAdd: (config: PortForwardConfig) => void
+  onUpdate?: (oldName: string, newConfig: PortForwardConfig) => void
   onClose: () => void
   loadContexts: () => Promise<void>
   loadNamespaces: (context: string) => Promise<void>
@@ -14,10 +15,15 @@ type AddConfigFormProps = {
   availablePorts: string[]
   error?: string
   onClearError: () => void
+  editingConfig?: {
+    config: PortForwardConfig
+    index: number
+  } | null
 }
 
 let AddConfigForm = ({
   onAdd,
+  onUpdate,
   onClose,
   loadContexts,
   loadNamespaces,
@@ -29,10 +35,11 @@ let AddConfigForm = ({
   availablePorts,
   error,
   onClearError,
+  editingConfig,
 }: AddConfigFormProps) => {
-  let [selectedContext, setSelectedContext] = useState("")
-  let [selectedNamespace, setSelectedNamespace] = useState("")
-  let [selectedService, setSelectedService] = useState("")
+  let [selectedContext, setSelectedContext] = useState(editingConfig?.config.context || "")
+  let [selectedNamespace, setSelectedNamespace] = useState(editingConfig?.config.namespace || "")
+  let [selectedService, setSelectedService] = useState(editingConfig?.config.service || "")
   let [loadingContexts, setLoadingContexts] = useState(false)
   let [loadingNamespaces, setLoadingNamespaces] = useState(false)
   let [loadingServices, setLoadingServices] = useState(false)
@@ -62,11 +69,28 @@ let AddConfigForm = ({
           setLoadingNamespaces(false)
         }
       }
-      setSelectedNamespace("")
-      setSelectedService("")
+      if (!editingConfig) {
+        setSelectedNamespace("")
+        setSelectedService("")
+      }
       loadData()
     }
   }, [selectedContext])
+
+  // Auto-load namespaces for editing mode when contexts are available
+  useEffect(() => {
+    if (editingConfig && selectedContext && availableContexts.length > 0 && !loadingContexts) {
+      let loadData = async () => {
+        setLoadingNamespaces(true)
+        try {
+          await loadNamespaces(selectedContext)
+        } finally {
+          setLoadingNamespaces(false)
+        }
+      }
+      loadData()
+    }
+  }, [editingConfig, availableContexts, loadingContexts])
 
   // Auto-select first available namespace when namespaces load
   useEffect(() => {
@@ -86,10 +110,27 @@ let AddConfigForm = ({
           setLoadingServices(false)
         }
       }
-      setSelectedService("")
+      if (!editingConfig) {
+        setSelectedService("")
+      }
       loadData()
     }
   }, [selectedNamespace])
+
+  // Auto-load services for editing mode when namespaces are available
+  useEffect(() => {
+    if (editingConfig && selectedContext && selectedNamespace && availableNamespaces.length > 0 && !loadingNamespaces) {
+      let loadData = async () => {
+        setLoadingServices(true)
+        try {
+          await loadServices(selectedContext, selectedNamespace)
+        } finally {
+          setLoadingServices(false)
+        }
+      }
+      loadData()
+    }
+  }, [editingConfig, availableNamespaces, loadingNamespaces, selectedNamespace])
 
   // Auto-select first available service when services load
   useEffect(() => {
@@ -113,6 +154,21 @@ let AddConfigForm = ({
     }
   }, [selectedService])
 
+  // Auto-load ports for editing mode when services are available
+  useEffect(() => {
+    if (editingConfig && selectedContext && selectedNamespace && selectedService && availableServices.length > 0 && !loadingServices) {
+      let loadData = async () => {
+        setLoadingPorts(true)
+        try {
+          await loadPorts(selectedContext, selectedNamespace, selectedService)
+        } finally {
+          setLoadingPorts(false)
+        }
+      }
+      loadData()
+    }
+  }, [editingConfig, availableServices, loadingServices, selectedService])
+
   let handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     let formData = new FormData(e.target as HTMLFormElement)
@@ -122,7 +178,7 @@ let AddConfigForm = ({
       .map((p) => p.trim())
       .filter((p) => p.length > 0)
 
-    let newConfig: PortForwardConfig = {
+    let config: PortForwardConfig = {
       name: formData.get("name") as string,
       context: selectedContext,
       namespace: selectedNamespace,
@@ -130,7 +186,11 @@ let AddConfigForm = ({
       ports: ports,
     }
 
-    onAdd(newConfig)
+    if (editingConfig && onUpdate) {
+      onUpdate(editingConfig.config.name, config)
+    } else {
+      onAdd(config)
+    }
     onClose()
   }
 
@@ -144,7 +204,7 @@ let AddConfigForm = ({
   return (
     <div className="add-form-modal">
       <div className="add-form">
-        <h3>Add New Port Forward Configuration</h3>
+        <h3>{editingConfig ? "Edit Port Forward Configuration" : "Add New Port Forward Configuration"}</h3>
         
         {error && (
           <div className="form-error">
@@ -166,6 +226,7 @@ let AddConfigForm = ({
             <input
               type="text"
               name="name"
+              defaultValue={editingConfig?.config.name || ""}
               placeholder="Custom name for this configuration"
               required
             />
@@ -180,11 +241,31 @@ let AddConfigForm = ({
               required
             >
               <option value="">{loadingContexts ? "Loading contexts..." : "Select context..."}</option>
-              {availableContexts.map((ctx) => (
-                <option key={ctx} value={ctx}>
-                  {ctx}
-                </option>
-              ))}
+              {(() => {
+                let allContexts = [...availableContexts]
+                let originalContext = editingConfig?.config.context
+                
+                // Add original context if it's not in available contexts (unavailable)
+                if (originalContext && !availableContexts.includes(originalContext)) {
+                  allContexts.unshift(originalContext)
+                }
+                
+                return allContexts.map((ctx) => {
+                  let isUnavailable = originalContext && ctx === originalContext && !availableContexts.includes(ctx)
+                  return (
+                    <option 
+                      key={ctx} 
+                      value={ctx}
+                      style={{ 
+                        color: isUnavailable ? '#888' : 'inherit',
+                        fontStyle: isUnavailable ? 'italic' : 'normal'
+                      }}
+                    >
+                      {ctx}{isUnavailable ? ' (unavailable)' : ''}
+                    </option>
+                  )
+                })
+              })()}
             </select>
             {loadingContexts && <div className="loading-bar"><div className="loading-progress"></div></div>}
           </div>
@@ -198,11 +279,31 @@ let AddConfigForm = ({
               style={{ opacity: !selectedContext || loadingNamespaces ? 0.6 : 1 }}
             >
               <option value="">{loadingNamespaces ? "Loading namespaces..." : "Select namespace..."}</option>
-              {availableNamespaces.map((ns) => (
-                <option key={ns} value={ns}>
-                  {ns}
-                </option>
-              ))}
+              {(() => {
+                let allNamespaces = [...availableNamespaces]
+                let originalNamespace = editingConfig?.config.namespace
+                
+                // Add original namespace if it's not in available namespaces (unavailable)
+                if (originalNamespace && !availableNamespaces.includes(originalNamespace)) {
+                  allNamespaces.unshift(originalNamespace)
+                }
+                
+                return allNamespaces.map((ns) => {
+                  let isUnavailable = originalNamespace && ns === originalNamespace && !availableNamespaces.includes(ns)
+                  return (
+                    <option 
+                      key={ns} 
+                      value={ns}
+                      style={{ 
+                        color: isUnavailable ? '#888' : 'inherit',
+                        fontStyle: isUnavailable ? 'italic' : 'normal'
+                      }}
+                    >
+                      {ns}{isUnavailable ? ' (unavailable)' : ''}
+                    </option>
+                  )
+                })
+              })()}
             </select>
             {loadingNamespaces && <div className="loading-bar"><div className="loading-progress"></div></div>}
           </div>
@@ -216,11 +317,31 @@ let AddConfigForm = ({
               style={{ opacity: !selectedContext || !selectedNamespace || loadingServices ? 0.6 : 1 }}
             >
               <option value="">{loadingServices ? "Loading services..." : "Select service..."}</option>
-              {availableServices.map((svc) => (
-                <option key={svc} value={svc}>
-                  {svc}
-                </option>
-              ))}
+              {(() => {
+                let allServices = [...availableServices]
+                let originalService = editingConfig?.config.service
+                
+                // Add original service if it's not in available services (unavailable)
+                if (originalService && !availableServices.includes(originalService)) {
+                  allServices.unshift(originalService)
+                }
+                
+                return allServices.map((svc) => {
+                  let isUnavailable = originalService && svc === originalService && !availableServices.includes(svc)
+                  return (
+                    <option 
+                      key={svc} 
+                      value={svc}
+                      style={{ 
+                        color: isUnavailable ? '#888' : 'inherit',
+                        fontStyle: isUnavailable ? 'italic' : 'normal'
+                      }}
+                    >
+                      {svc}{isUnavailable ? ' (unavailable)' : ''}
+                    </option>
+                  )
+                })
+              })()}
             </select>
             {loadingServices && <div className="loading-bar"><div className="loading-progress"></div></div>}
           </div>
@@ -252,11 +373,17 @@ let AddConfigForm = ({
                 </div>
               </div>
             )}
-            <input type="text" name="ports" placeholder="e.g., 8080:80, 9090:3000" required />
+            <input 
+              type="text" 
+              name="ports" 
+              defaultValue={editingConfig?.config.ports.join(", ") || ""}
+              placeholder="e.g., 8080:80, 9090:3000" 
+              required 
+            />
             <small>Comma-separated list of local:remote ports</small>
           </div>
           <div className="form-actions">
-            <button type="submit">Add Configuration</button>
+            <button type="submit">{editingConfig ? "Update Configuration" : "Add Configuration"}</button>
             <button type="button" onClick={handleCancel}>
               Cancel
             </button>

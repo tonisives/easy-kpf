@@ -110,9 +110,12 @@ export let useConfigs = (
 
   let updateConfig = async (oldServiceKey: string, newConfig: PortForwardConfig) => {
     try {
-      await invoke("remove_port_forward_config", { serviceKey: oldServiceKey })
-      await invoke("add_port_forward_config", { config: newConfig })
+      await invoke("update_port_forward_config", { 
+        oldServiceKey: oldServiceKey, 
+        newConfig: newConfig 
+      })
       await loadConfigs()
+      await updateServiceStatus()
       setMessage(`Updated configuration for ${newConfig.name}`)
     } catch (error) {
       setMessage(`Error updating config: ${error}`)
