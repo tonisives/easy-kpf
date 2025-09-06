@@ -3,25 +3,6 @@
 version = 4
 
 [[package]]
-name = "EasyKpf"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "dirs 5.0.1",
- "env_logger",
- "log",
- "serde",
- "serde_json",
- "serde_yaml",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
- "tauri-plugin-shell",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
 name = "addr2line"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -855,6 +836,25 @@ name = "dyn-clone"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
+
+[[package]]
+name = "easy-kpf"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "dirs 5.0.1",
+ "env_logger",
+ "log",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+ "tauri-plugin-shell",
+ "thiserror 1.0.69",
+ "tokio",
+]
 
 [[package]]
 name = "embed-resource"
