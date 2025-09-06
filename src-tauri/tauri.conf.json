@@ -39,7 +39,10 @@
     ],
     "macOS": {
       "entitlements": "entitlements.plist",
-      "minimumSystemVersion": "10.13"
+      "minimumSystemVersion": "10.13",
+      "signingIdentity": "-",
+      "providerShortName": null,
+      "hardenedRuntime": true
     }
   }
 }
