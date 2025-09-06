@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "EasyKpf",
+  "productName": "easy-kpf",
   "version": "0.1.0",
   "identifier": "com.tonisives.easy-kpf",
   "build": {
