@@ -1,51 +1,36 @@
 # Easy KPF - Kubernetes Port Forward Manager
 
-A simple, intuitive application for managing Kubernetes port forwarding.
+A desktop application for managing Kubernetes port forwarding with a clean interface.
 
-## Key Features
+![Main Interface](etc/images/appstore_screenshots/one_1280x800.png)
 
-### One-Click Port Forwarding
+## Features
 
-- Start and stop port forwarding with a single click
-- Visual status indicators show which services are running
-- Support for multiple port mappings per service
+- Visual port forwarding management
+- Support for multiple Kubernetes contexts
+- Drag and drop interface for organizing forwards
+- Real-time status monitoring
+- Persistent configuration storage
 
-### Configuration Management
+![Configuration](etc/images/appstore_screenshots/two_1280x800.png)
 
-- Save and manage port forwarding configurations
-- Quick access to frequently used services
-- Edit and update configurations on the fly
+![Port Forwards](etc/images/appstore_screenshots/three_1280x800.png)
 
-### Smart Kubernetes Integration
-
-- Browse all available kubectl contexts
-- Discover namespaces and services automatically
-- Auto-detect service ports for easy setup
-
-### Native Desktop Experience
-
-- Fast, responsive native application built with Rust
-- Clean, modern interface
-- Cross-platform support (macOS, Windows, Linux)
-
-### Developer Friendly
-
-- No complex configuration files
-- Works with existing kubectl setup
-- Lightweight and resource-efficient
-
-### Requirements
+## Requirements
 
 - kubectl installed and configured
 - At least one Kubernetes context configured
 
-### Quick Start
+## Installation
 
-1. Launch the app
-2. Select your Kubernetes context, namespace, and service
-3. Configure port mappings
-4. Click start to begin port forwarding
-5. Access your services at `localhost:<port>`
+Built with Tauri (Rust + React). Cross-platform support for macOS, Windows, and Linux.
+
+## Development
+
+```bash
+pnpm install
+pnpm tauri dev
+```
 
 ## Build
 
@@ -53,4 +38,34 @@ A simple, intuitive application for managing Kubernetes port forwarding.
 pnpm tauri build
 ```
 
-Perfect for developers working with Kubernetes who want a simple, reliable way to manage port forwarding without command-line complexity.
+## Configuration
+
+Port forward configurations are stored in YAML files in the system config directory:
+
+- **macOS**: `~/Library/Application Support/EasyKpf/`
+- **Linux**: `~/.config/EasyKpf/`
+- **Windows**: `%APPDATA%/EasyKpf/`
+
+### Configuration Files
+
+- `port-forwards.yaml` - Port forward definitions
+- `app-config.yaml` - Application settings (kubectl path, kubeconfig path)
+
+### Port Forward Configuration Structure
+
+```yaml
+configs:
+  - name: "My Service"
+    context: "minikube"
+    namespace: "default"
+    service: "my-service"
+    ports: ["8080:80", "9090:9090"]
+```
+
+Configuration files are automatically created with defaults on first run.
+
+## Technology
+
+- Frontend: React + TypeScript + Vite
+- Backend: Rust + Tauri
+- Kubernetes integration via kubectl

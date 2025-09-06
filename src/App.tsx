@@ -19,7 +19,6 @@ import {
 import ServiceCard from "./ServiceCard"
 import ServiceSettings from "./components/ServiceSettings"
 import AddConfigForm from "./components/AddConfigForm"
-import EditConfigForm from "./components/EditConfigForm"
 import SetupScreen from "./components/SetupScreen"
 import "./App.css"
 import { PortForwardConfig, useConfigs } from "./hooks/hooks"
@@ -36,10 +35,6 @@ function App() {
     config: PortForwardConfig
     index: number
   } | null>(null)
-  let [availableContexts, setAvailableContexts] = useState<string[]>([])
-  let [availableNamespaces, setAvailableNamespaces] = useState<string[]>([])
-  let [availableServices, setAvailableServices] = useState<string[]>([])
-  let [availablePorts, setAvailablePorts] = useState<string[]>([])
   let [activeId, setActiveId] = useState<string | null>(null)
   let {
     configs,
@@ -50,21 +45,11 @@ function App() {
     addConfig,
     removeConfig,
     updateConfig,
-    loadContexts,
-    loadNamespaces,
-    loadServices,
     reorderConfig,
-    loadPorts,
     stopPortForward,
     clearServiceError,
     clearFormError,
-  } = useConfigs(
-    setMessage,
-    setAvailablePorts,
-    setAvailableContexts,
-    setAvailableNamespaces,
-    setAvailableServices,
-  )
+  } = useConfigs(setMessage, () => {}, () => {}, () => {}, () => {})
 
   useEffect(() => {
     let checkKubectlSetup = async () => {
@@ -113,10 +98,14 @@ function App() {
   }
 
   if (!kubectlConfigured || showSettings) {
-    return <SetupScreen onSetupComplete={() => {
-      setKubectlConfigured(true)
-      setShowSettings(false)
-    }} />
+    return <SetupScreen 
+      onSetupComplete={() => {
+        setKubectlConfigured(true)
+        setShowSettings(false)
+      }}
+      onCancel={showSettings ? () => setShowSettings(false) : undefined}
+      isDialog={showSettings}
+    />
   }
 
   return (
@@ -198,29 +187,11 @@ function App() {
 
       {showAddForm && (
         <AddConfigForm
-          onAdd={(config) => {
-            addConfig(config)
-            setAvailableContexts([])
-            setAvailableNamespaces([])
-            setAvailableServices([])
-            setAvailablePorts([])
-          }}
+          onAdd={addConfig}
           onClose={() => {
             setShowAddForm(false)
-            setAvailableContexts([])
-            setAvailableNamespaces([])
-            setAvailableServices([])
-            setAvailablePorts([])
             clearFormError()
           }}
-          loadContexts={loadContexts}
-          loadNamespaces={loadNamespaces}
-          loadServices={loadServices}
-          loadPorts={loadPorts}
-          availableContexts={availableContexts}
-          availableNamespaces={availableNamespaces}
-          availableServices={availableServices}
-          availablePorts={availablePorts}
           error={formError}
           onClearError={clearFormError}
         />
@@ -237,17 +208,23 @@ function App() {
         configs={configs}
       />
 
-      <EditConfigForm
-        editingConfig={editingConfig}
-        onUpdate={(oldName, newConfig) => {
-          updateConfig(oldName, newConfig)
-          setEditingConfig(null)
-        }}
-        onClose={() => {
-          setShowConfigForm(false)
-          setEditingConfig(null)
-        }}
-      />
+      {editingConfig && (
+        <AddConfigForm
+          editingConfig={editingConfig}
+          onAdd={() => {}}
+          onUpdate={(oldName, newConfig) => {
+            updateConfig(oldName, newConfig)
+            setEditingConfig(null)
+          }}
+          onClose={() => {
+            setShowConfigForm(false)
+            setEditingConfig(null)
+            clearFormError()
+          }}
+          error={formError}
+          onClearError={clearFormError}
+        />
+      )}
 
       {message && (
         <div className="message">

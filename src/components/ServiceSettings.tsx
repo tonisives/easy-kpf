@@ -50,8 +50,8 @@ let ServiceSettings = ({ config, onEdit, onDelete, onClose, configs }: ServiceSe
           >
             Delete Configuration
           </button>
-          <button onClick={onClose} className="close-button">
-            Close
+          <button onClick={onClose} className="cancel-button">
+            Cancel
           </button>
         </div>
       </div>

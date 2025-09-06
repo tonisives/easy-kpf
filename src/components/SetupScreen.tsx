@@ -3,9 +3,11 @@ import { invoke } from "@tauri-apps/api/core"
 
 type SetupScreenProps = {
   onSetupComplete: () => void
+  onCancel?: () => void
+  isDialog?: boolean
 }
 
-let SetupScreen = ({ onSetupComplete }: SetupScreenProps) => {
+let SetupScreen = ({ onSetupComplete, onCancel, isDialog }: SetupScreenProps) => {
   let [kubectlPath, setKubectlPath] = useState("")
   let [isDetecting, setIsDetecting] = useState(false)
   let [isValidating, setIsValidating] = useState(false)
@@ -128,7 +130,7 @@ let SetupScreen = ({ onSetupComplete }: SetupScreenProps) => {
     loadContexts()
   }, [])
 
-  return (
+  let content = (
     <div style={{ padding: "20px", maxWidth: "600px", margin: "0 auto" }}>
       <h2>Setup kubectl</h2>
       <p>We need to locate kubectl on your system to manage port forwarding.</p>
@@ -296,7 +298,7 @@ let SetupScreen = ({ onSetupComplete }: SetupScreenProps) => {
         }}
       />
 
-      <div style={{ display: "flex", width: "100%", justifyContent: "start" }}>
+      <div style={{ display: "flex", width: "100%", justifyContent: "start", gap: "10px" }}>
         <button
           onClick={handleSave}
           disabled={!isValid || isValidating}
@@ -309,11 +311,21 @@ let SetupScreen = ({ onSetupComplete }: SetupScreenProps) => {
             cursor: isValid ? "pointer" : "not-allowed",
           }}
         >
-          Continue
+          {isDialog && onCancel ? "Ok" : "Continue"}
         </button>
       </div>
     </div>
   )
+
+  if (isDialog) {
+    return (
+      <div className="settings-modal">
+        <div className="service-settings-popup">{content}</div>
+      </div>
+    )
+  }
+
+  return content
 }
 
 export default SetupScreen
