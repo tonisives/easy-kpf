@@ -118,6 +118,30 @@ let AddConfigForm = ({
             originalValueKey="service"
           />
           <div className="form-group">
+            <label>Forward Type:</label>
+            <select 
+              name="forwardType" 
+              defaultValue={defaultValues.forwardType}
+              required
+            >
+              <option value="Kubectl">Kubectl Port Forward</option>
+              <option value="Ssh">SSH Port Forward</option>
+            </select>
+            <small>Choose between kubectl or SSH port forwarding</small>
+          </div>
+
+          <div className="form-group">
+            <label>Local Interface (Optional):</label>
+            <input 
+              type="text" 
+              name="localInterface" 
+              defaultValue={defaultValues.localInterface}
+              placeholder="e.g., 127.0.0.2, 0.0.0.0" 
+            />
+            <small>Bind to specific interface (default: 127.0.0.1). Will create if doesn't exist.</small>
+          </div>
+
+          <div className="form-group">
             <label>Ports:</label>
             <PortSuggestions ports={ports.data} loading={ports.loading} />
             <input 

@@ -25,6 +25,9 @@ pub enum AppError {
 
   #[error("Invalid input: {0}")]
   InvalidInput(String),
+
+  #[error("System error: {0}")]
+  System(String),
 }
 
 impl From<AppError> for String {

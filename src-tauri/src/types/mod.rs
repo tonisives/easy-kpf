@@ -8,6 +8,17 @@ pub struct PortForwardConfig {
   pub namespace: String,
   pub service: String,
   pub ports: Vec<String>,
+  #[serde(default)]
+  pub local_interface: Option<String>,
+  #[serde(default)]
+  pub forward_type: ForwardType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub enum ForwardType {
+  #[default]
+  Kubectl,
+  Ssh,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

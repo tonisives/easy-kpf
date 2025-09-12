@@ -29,7 +29,15 @@ impl ConfigService {
     }
 
     let config_content = fs::read_to_string(&config_path)?;
-    let configs: PortForwardConfigs = serde_yaml::from_str(&config_content)?;
+    let mut configs: PortForwardConfigs = serde_yaml::from_str(&config_content)?;
+
+    // Migrate old configs to include new fields with defaults
+    for config in &mut configs.configs {
+      if config.local_interface.is_none() {
+        config.local_interface = None; // Keep as None for existing configs
+      }
+    }
+
     Ok(configs.configs)
   }
 
