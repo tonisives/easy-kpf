@@ -83,3 +83,39 @@ pub fn get_running_services(
     .get_running_services()
     .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn verify_port_forwards(
+  port_forward_service: State<'_, PortForwardService>,
+) -> Result<Vec<(String, bool)>, String> {
+  port_forward_service
+    .verify_port_forwards()
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn verify_and_update_port_forwards(
+  port_forward_service: State<'_, PortForwardService>,
+) -> Result<Vec<String>, String> {
+  port_forward_service
+    .verify_and_update_port_forwards()
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn detect_existing_port_forwards(
+  port_forward_service: State<'_, PortForwardService>,
+) -> Result<Vec<String>, String> {
+  port_forward_service
+    .detect_existing_port_forwards()
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn sync_with_existing_processes(
+  port_forward_service: State<'_, PortForwardService>,
+) -> Result<Vec<String>, String> {
+  port_forward_service
+    .sync_with_existing_processes()
+    .map_err(|e| e.to_string())
+}

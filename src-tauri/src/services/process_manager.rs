@@ -69,6 +69,20 @@ impl ProcessManager {
     Ok(processes.keys().cloned().collect())
   }
 
+  pub fn get_running_services_with_pids(&self) -> Result<Vec<(String, u32)>> {
+    let processes = self
+      .processes
+      .lock()
+      .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
+
+    Ok(
+      processes
+        .iter()
+        .map(|(name, info)| (name.clone(), info.pid))
+        .collect(),
+    )
+  }
+
   pub fn update_process_name(&self, old_name: &str, new_name: String) -> Result<()> {
     let mut processes = self
       .processes

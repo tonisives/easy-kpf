@@ -13,6 +13,7 @@ export let parseFormData = (formData: FormData, selectedContext: string, selecte
     namespace: selectedNamespace,
     service: selectedService,
     ports: ports,
+    forward_type: (formData.get("forward_type") as "Kubectl" | "Ssh") || "Kubectl",
   }
 }
 

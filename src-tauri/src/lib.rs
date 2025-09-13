@@ -49,6 +49,10 @@ pub fn run() {
       start_port_forward_by_key,
       stop_port_forward,
       get_running_services,
+      verify_port_forwards,
+      verify_and_update_port_forwards,
+      detect_existing_port_forwards,
+      sync_with_existing_processes,
       // Kubectl handlers
       get_kubectl_contexts,
       set_kubectl_context,

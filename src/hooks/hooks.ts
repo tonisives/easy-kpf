@@ -7,12 +7,16 @@ export type ServiceStatus = {
   error?: string
 }
 
+export type ForwardType = "Kubectl" | "Ssh"
+
 export type PortForwardConfig = {
   name: string
   context: string
   namespace: string
   service: string
   ports: string[]
+  local_interface?: string
+  forward_type: ForwardType
 }
 
 export let useConfigs = (
@@ -38,6 +42,17 @@ export let useConfigs = (
     }
   }
 
+  let syncWithExistingProcesses = async () => {
+    try {
+      let syncedServices: string[] = await invoke("sync_with_existing_processes")
+      if (syncedServices.length > 0) {
+        console.log("Synced with existing port forwards:", syncedServices)
+      }
+    } catch (error) {
+      console.error("Failed to sync with existing processes:", error)
+    }
+  }
+
   let updateServiceStatus = async () => {
     try {
       let runningServices: string[] = await invoke("get_running_services")
@@ -52,8 +67,38 @@ export let useConfigs = (
     }
   }
 
+  let verifyPortForwards = async () => {
+    try {
+      let stoppedServices: string[] = await invoke("verify_and_update_port_forwards")
+      if (stoppedServices.length > 0) {
+        setServices((prev) =>
+          prev.map((service) => ({
+            ...service,
+            running: !stoppedServices.includes(service.name) && service.running,
+            error: stoppedServices.includes(service.name) 
+              ? "Port forward stopped unexpectedly" 
+              : service.error,
+          })),
+        )
+      }
+    } catch (error) {
+      console.error("Failed to verify port forwards:", error)
+    }
+  }
+
   useEffect(() => {
-    loadConfigs().then(updateServiceStatus)
+    loadConfigs()
+      .then(syncWithExistingProcesses)
+      .then(updateServiceStatus)
+    
+    // Set up periodic verification of port forwards
+    let verificationInterval = setInterval(() => {
+      verifyPortForwards()
+    }, 5000) // Check every 5 seconds
+    
+    return () => {
+      clearInterval(verificationInterval)
+    }
   }, [])
 
   let startPortForward = async (serviceKey: string) => {
