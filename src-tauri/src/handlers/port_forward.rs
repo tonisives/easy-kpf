@@ -119,3 +119,37 @@ pub fn sync_with_existing_processes(
     .sync_with_existing_processes()
     .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn test_ssh_connection(ssh_host: String) -> Result<String, String> {
+  use std::process::Command;
+  use std::time::Duration;
+  use tokio::time::timeout;
+
+  let test_command = async {
+    let output = Command::new("ssh")
+      .args([
+        "-o",
+        "ConnectTimeout=5",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "StrictHostKeyChecking=no",
+        &ssh_host,
+        "exit",
+      ])
+      .output()
+      .map_err(|e| format!("Failed to execute SSH command: {}", e))?;
+
+    if output.status.success() {
+      Ok("SSH connection successful".to_string())
+    } else {
+      let stderr = String::from_utf8_lossy(&output.stderr);
+      Err(format!("SSH connection failed: {}", stderr))
+    }
+  };
+
+  timeout(Duration::from_secs(10), test_command)
+    .await
+    .map_err(|_| "SSH connection test timed out".to_string())?
+}
