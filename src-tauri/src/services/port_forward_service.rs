@@ -1,12 +1,19 @@
 use crate::error::{AppError, Result};
+use crate::services::command_builder::{KubectlCommandBuilder, SshCommandBuilder};
+use crate::services::config_cache::ConfigCache;
+use crate::services::interface::{InterfaceManager, SystemInterfaceManager};
+use crate::services::process_detector::ProcessDetector;
 use crate::services::{ConfigService, KubectlOperations, ProcessManager};
 use crate::types::PortForwardConfig;
 use tauri_plugin_shell::ShellExt;
 
 pub struct PortForwardService {
   app_handle: tauri::AppHandle,
+  config_cache: ConfigCache,
   config_service: ConfigService,
   process_manager: ProcessManager,
+  interface_manager: SystemInterfaceManager,
+  process_detector: ProcessDetector,
 }
 
 impl PortForwardService {
@@ -17,40 +24,27 @@ impl PortForwardService {
   ) -> Self {
     Self {
       app_handle,
+      config_cache: ConfigCache::new(config_service.clone()),
       config_service,
       process_manager,
+      interface_manager: SystemInterfaceManager,
+      process_detector: ProcessDetector::new(),
     }
   }
 
   pub fn get_configs(&self) -> Result<Vec<PortForwardConfig>> {
-    self.config_service.load_port_forwards()
+    self.config_cache.get_configs()
   }
 
   pub fn add_config(&self, config: PortForwardConfig) -> Result<()> {
-    let mut configs = self.config_service.load_port_forwards()?;
-    configs.push(config);
-    self.config_service.save_port_forwards(&configs)
+    self.config_cache.add_config(config)
   }
 
   pub fn remove_config(&self, service_key: &str) -> Result<()> {
-    let mut configs = self.config_service.load_port_forwards()?;
-    configs.retain(|c| c.name != service_key);
-    self.config_service.save_port_forwards(&configs)
+    self.config_cache.remove_config(service_key)
   }
 
   pub fn update_config(&self, old_service_key: &str, new_config: PortForwardConfig) -> Result<()> {
-    let mut configs = self.config_service.load_port_forwards()?;
-
-    let current_index = configs
-      .iter()
-      .position(|c| c.name == old_service_key)
-      .ok_or_else(|| {
-        AppError::NotFound(format!(
-          "Configuration not found for service: {}",
-          old_service_key
-        ))
-      })?;
-
     // If the service name changed, update the process manager
     if old_service_key != new_config.name {
       self
@@ -58,33 +52,11 @@ impl PortForwardService {
         .update_process_name(old_service_key, new_config.name.clone())?;
     }
 
-    // Replace the config at the same position
-    configs[current_index] = new_config;
-
-    self.config_service.save_port_forwards(&configs)
+    self.config_cache.update_config(old_service_key, new_config)
   }
 
   pub fn reorder_config(&self, service_key: &str, new_index: usize) -> Result<()> {
-    let mut configs = self.config_service.load_port_forwards()?;
-
-    let current_index = configs
-      .iter()
-      .position(|c| c.name == service_key)
-      .ok_or_else(|| {
-        AppError::NotFound(format!(
-          "Configuration not found for service: {}",
-          service_key
-        ))
-      })?;
-
-    if new_index >= configs.len() {
-      return Err(AppError::InvalidInput("Invalid new index".to_string()));
-    }
-
-    let config = configs.remove(current_index);
-    configs.insert(new_index, config);
-
-    self.config_service.save_port_forwards(&configs)
+    self.config_cache.reorder_config(service_key, new_index)
   }
 
   pub async fn start_port_forward_by_key<K: KubectlOperations>(
@@ -92,16 +64,12 @@ impl PortForwardService {
     kubectl_service: &K,
     service_key: &str,
   ) -> Result<String> {
-    let configs = self.config_service.load_port_forwards()?;
-    let config = configs
-      .into_iter()
-      .find(|c| c.name == service_key)
-      .ok_or_else(|| {
-        AppError::NotFound(format!(
-          "Configuration not found for service: {}",
-          service_key
-        ))
-      })?;
+    let config = self.config_cache.find_config(service_key)?.ok_or_else(|| {
+      AppError::NotFound(format!(
+        "Configuration not found for service: {}",
+        service_key
+      ))
+    })?;
 
     self
       .start_port_forward_generic(kubectl_service, config)
@@ -150,36 +118,30 @@ impl PortForwardService {
   }
 
   async fn execute_kubectl_port_forward(&self, config: &PortForwardConfig) -> Result<String> {
-    let shell = self.app_handle.shell();
-
     // Create local interface if specified and doesn't exist
     if let Some(ref interface) = config.local_interface {
-      self.ensure_interface_exists(interface)?;
+      self.interface_manager.ensure_interface_exists(interface)?;
     }
 
-    let mut args = vec!["-n", &config.namespace, "port-forward", &config.service];
-
-    // Add --address flag if local interface is specified
-    if let Some(ref interface) = config.local_interface {
-      args.extend_from_slice(&["--address", interface]);
-    }
-
-    let port_refs: Vec<&str> = config.ports.iter().map(|s| s.as_str()).collect();
-    args.extend(port_refs);
-
-    let kubectl_cmd = self
+    let kubectl_path = self
       .config_service
       .load_kubectl_path()
       .unwrap_or_else(|_| "kubectl".to_string());
 
-    let mut command = shell.command(&kubectl_cmd);
+    let kubeconfig_path = self.config_service.load_kubeconfig_path().ok().flatten();
 
-    // Set kubeconfig if available
-    if let Ok(Some(kubeconfig)) = self.config_service.load_kubeconfig_path() {
-      command = command.env("KUBECONFIG", kubeconfig);
+    let (command, args, env_vars) = KubectlCommandBuilder::new(kubectl_path, kubeconfig_path)
+      .build_port_forward_command(config);
+
+    let shell = self.app_handle.shell();
+    let mut command_builder = shell.command(&command);
+
+    // Set environment variables
+    for (key, value) in env_vars {
+      command_builder = command_builder.env(key, value);
     }
 
-    let (_rx, child) = command
+    let (_rx, child) = command_builder
       .args(args)
       .spawn()
       .map_err(|e| AppError::PortForward(e.to_string()))?;
@@ -198,65 +160,24 @@ impl PortForwardService {
   }
 
   async fn execute_ssh_port_forward(&self, config: &PortForwardConfig) -> Result<String> {
-    let shell = self.app_handle.shell();
-
     // Create local interface if specified and doesn't exist
     if let Some(ref interface) = config.local_interface {
-      self.ensure_interface_exists(interface)?;
+      self.interface_manager.ensure_interface_exists(interface)?;
     }
 
-    // For SSH port forwarding, we need to parse the service as a host:port
-    // Format: username@host or host (assuming current user)
-    let ssh_target = &config.service;
-
-    let mut ssh_args = vec![
-      "-N", // Don't execute remote command
-      "-o",
-      "BatchMode=yes", // Don't prompt for passwords
-      "-o",
-      "StrictHostKeyChecking=no", // Don't prompt for host key verification
-      "-o",
-      "ConnectTimeout=10", // 10 second connection timeout
-      "-o",
-      "ServerAliveInterval=60", // Keep connection alive
-      "-o",
-      "ServerAliveCountMax=3", // Max keep-alive attempts
-    ];
-
-    // Collect port forwarding arguments first to avoid borrowing issues
-    let mut forward_args = Vec::new();
-    for port_mapping in &config.ports {
-      let bind_interface = config.local_interface.as_deref().unwrap_or("127.0.0.1");
-      // SSH -L format: [bind_address:]port:host:hostport
-      // For port mapping like "5432:5432", we want: "127.0.0.1:5432:localhost:5432"
-      let parts: Vec<&str> = port_mapping.split(':').collect();
-      let forward_arg = if parts.len() == 2 {
-        format!("{}:{}:localhost:{}", bind_interface, parts[0], parts[1])
-      } else if parts.len() == 1 {
-        // Single port means same port for local and remote
-        format!("{}:{}:localhost:{}", bind_interface, parts[0], parts[0])
-      } else {
-        // Already in correct format or custom format
-        format!("{}:{}", bind_interface, port_mapping)
-      };
-      forward_args.push(forward_arg);
-    }
-
-    // Add port forwarding arguments
-    for forward_arg in &forward_args {
-      ssh_args.extend_from_slice(&["-L", forward_arg]);
-    }
-
-    ssh_args.push(ssh_target);
+    let ssh_builder = SshCommandBuilder::new();
+    let (command, args) = ssh_builder.build_port_forward_command(config);
 
     log::debug!(
-      "Starting SSH port forward with command: ssh {}",
-      ssh_args.join(" ")
+      "Starting SSH port forward with command: {} {}",
+      command,
+      args.join(" ")
     );
 
+    let shell = self.app_handle.shell();
     let (_rx, child) = shell
-      .command("ssh")
-      .args(ssh_args)
+      .command(&command)
+      .args(args)
       .spawn()
       .map_err(|e| AppError::PortForward(format!("Failed to start SSH: {}", e)))?;
 
@@ -271,129 +192,6 @@ impl PortForwardService {
       "{} SSH port forwarding started with PID: {}",
       config.name, pid
     ))
-  }
-
-  fn ensure_interface_exists(&self, interface: &str) -> Result<()> {
-    // Skip for standard interfaces
-    if interface == "127.0.0.1" || interface == "0.0.0.0" || interface == "localhost" {
-      return Ok(());
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-      use std::process::Command;
-
-      // Check if IP address is assigned to any interface
-      let output = Command::new("ifconfig")
-        .output()
-        .map_err(|e| AppError::System(format!("Failed to check interfaces: {}", e)))?;
-
-      let output_str = String::from_utf8_lossy(&output.stdout);
-      let ip_exists = output_str
-        .lines()
-        .any(|line| line.trim().starts_with("inet") && line.contains(interface));
-
-      if !output.status.success() || !ip_exists {
-        // Check if we can create interface without sudo first
-        let create_output_nosudo = Command::new("ifconfig")
-          .args(["lo0", "alias", interface])
-          .output();
-
-        let create_success = match create_output_nosudo {
-          Ok(output) => output.status.success(),
-          Err(_) => false,
-        };
-
-        if !create_success {
-          // Try with sudo, but handle password requirement gracefully
-          let create_output = Command::new("sudo")
-            .args(["-n", "ifconfig", "lo0", "alias", interface]) // -n prevents password prompt
-            .output()
-            .map_err(|e| AppError::System(format!("Failed to create interface: {}", e)))?;
-
-          if !create_output.status.success() {
-            let stderr_msg = String::from_utf8_lossy(&create_output.stderr);
-            if stderr_msg.contains("password") || stderr_msg.contains("sudo:") {
-              return Err(AppError::System(format!(
-                "Interface {} requires admin privileges to create. Please run: 'sudo ifconfig lo0 alias {}'",
-                interface, interface
-              )));
-            } else {
-              return Err(AppError::System(format!(
-                "Failed to create interface {}: {}",
-                interface, stderr_msg
-              )));
-            }
-          }
-        }
-      }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-      use std::process::Command;
-
-      // Check if interface exists
-      let output = Command::new("ip")
-        .args(&["addr", "show", interface])
-        .output()
-        .map_err(|e| AppError::System(format!("Failed to check interface: {}", e)))?;
-
-      if !output.status.success() {
-        // Check if we can create interface without sudo first
-        let create_output_nosudo = Command::new("ip")
-          .args(["addr", "add", &format!("{}/32", interface), "dev", "lo"])
-          .output();
-
-        let create_success = match create_output_nosudo {
-          Ok(output) => output.status.success(),
-          Err(_) => false,
-        };
-
-        if !create_success {
-          // Try with sudo, but handle password requirement gracefully
-          let create_output = Command::new("sudo")
-            .args([
-              "-n", // -n prevents password prompt
-              "ip",
-              "addr",
-              "add",
-              &format!("{}/32", interface),
-              "dev",
-              "lo",
-            ])
-            .output()
-            .map_err(|e| AppError::System(format!("Failed to create interface: {}", e)))?;
-
-          if !create_output.status.success() {
-            let stderr_msg = String::from_utf8_lossy(&create_output.stderr);
-            if stderr_msg.contains("password") || stderr_msg.contains("sudo:") {
-              return Err(AppError::System(format!(
-                "Interface {} requires admin privileges to create. Please run: 'sudo ip addr add {}/32 dev lo'",
-                interface, interface
-              )));
-            } else {
-              return Err(AppError::System(format!(
-                "Failed to create interface {}: {}",
-                interface, stderr_msg
-              )));
-            }
-          }
-        }
-      }
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-      // Windows doesn't support creating virtual interfaces easily
-      // Just validate it's a valid IP format
-      use std::net::IpAddr;
-      interface
-        .parse::<IpAddr>()
-        .map_err(|_| AppError::InvalidInput(format!("Invalid IP address: {}", interface)))?;
-    }
-
-    Ok(())
   }
 
   pub fn stop_port_forward(&self, service_name: &str) -> Result<String> {
@@ -431,7 +229,7 @@ impl PortForwardService {
     let mut results = Vec::new();
 
     for (service_name, pid) in running_services {
-      let is_actually_running = self.is_process_actually_running(pid)?;
+      let is_actually_running = self.process_detector.is_process_actually_running(pid)?;
       if !is_actually_running {
         // Clean up dead process
         let _ = self.process_manager.remove_process(&service_name);
@@ -440,39 +238,6 @@ impl PortForwardService {
     }
 
     Ok(results)
-  }
-
-  fn is_process_actually_running(&self, pid: u32) -> Result<bool> {
-    #[cfg(target_os = "macos")]
-    {
-      use std::process::Command;
-      let output = Command::new("ps")
-        .args(["-p", &pid.to_string()])
-        .output()
-        .map_err(|e| AppError::System(format!("Failed to check process: {}", e)))?;
-      Ok(output.status.success())
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-      use std::process::Command;
-      let output = Command::new("ps")
-        .args(["-p", &pid.to_string()])
-        .output()
-        .map_err(|e| AppError::System(format!("Failed to check process: {}", e)))?;
-      Ok(output.status.success())
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-      use std::process::Command;
-      let output = Command::new("tasklist")
-        .args(["/FI", &format!("PID eq {}", pid)])
-        .output()
-        .map_err(|e| AppError::System(format!("Failed to check process: {}", e)))?;
-      let output_str = String::from_utf8_lossy(&output.stdout);
-      Ok(output_str.contains(&pid.to_string()))
-    }
   }
 
   pub fn verify_and_update_port_forwards(&self) -> Result<Vec<String>> {
@@ -489,11 +254,11 @@ impl PortForwardService {
   }
 
   pub fn detect_existing_port_forwards(&self) -> Result<Vec<String>> {
-    let configs = self.config_service.load_port_forwards()?;
+    let configs = self.config_cache.get_configs()?;
     let mut detected_services = Vec::new();
 
     for config in &configs {
-      if self.is_kubectl_process_running(config)?
+      if self.process_detector.is_kubectl_process_running(config)?
         && !self.process_manager.contains_process(&config.name)?
       {
         detected_services.push(config.name.clone());
@@ -503,137 +268,23 @@ impl PortForwardService {
     Ok(detected_services)
   }
 
-  fn is_kubectl_process_running(&self, config: &PortForwardConfig) -> Result<bool> {
-    if config.forward_type != crate::types::ForwardType::Kubectl {
-      return Ok(false);
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-      use std::process::Command;
-
-      // Use ps with grep to find kubectl port-forward processes
-      let output = Command::new("ps")
-        .args(["aux"])
-        .output()
-        .map_err(|e| AppError::System(format!("Failed to list processes: {}", e)))?;
-
-      let stdout = String::from_utf8_lossy(&output.stdout);
-
-      for line in stdout.lines() {
-        if self.matches_kubectl_command(line, config) {
-          return Ok(true);
-        }
-      }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-      use std::process::Command;
-
-      let output = Command::new("ps")
-        .args(["aux"])
-        .output()
-        .map_err(|e| AppError::System(format!("Failed to list processes: {}", e)))?;
-
-      let stdout = String::from_utf8_lossy(&output.stdout);
-
-      for line in stdout.lines() {
-        if self.matches_kubectl_command(line, config) {
-          return Ok(true);
-        }
-      }
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-      // Windows implementation would go here if needed
-      return Ok(false);
-    }
-
-    Ok(false)
-  }
-
-  fn matches_kubectl_command(&self, process_line: &str, config: &PortForwardConfig) -> bool {
-    // Check if this is a kubectl port-forward command
-    if !process_line.contains("kubectl") || !process_line.contains("port-forward") {
-      return false;
-    }
-
-    // Check namespace
-    if !process_line.contains(&format!("-n {}", config.namespace))
-      && !process_line.contains(&format!("--namespace={}", config.namespace))
-      && !process_line.contains(&format!("--namespace {}", config.namespace))
-    {
-      return false;
-    }
-
-    // Check service name
-    if !process_line.contains(&config.service) {
-      return false;
-    }
-
-    // Check if at least one port mapping matches
-    for port in &config.ports {
-      if process_line.contains(port) {
-        return true;
-      }
-    }
-
-    false
-  }
-
   pub fn sync_with_existing_processes(&self) -> Result<Vec<String>> {
     let detected = self.detect_existing_port_forwards()?;
     let mut synced_services = Vec::new();
 
     for service_name in &detected {
-      // Try to extract PID from running process for this service
-      if let Some(pid) = self.find_kubectl_process_pid(service_name)? {
-        let configs = self.config_service.load_port_forwards()?;
-        if let Some(config) = configs.iter().find(|c| c.name == *service_name) {
+      let config = self.config_cache.find_config(service_name)?;
+      if let Some(config) = config {
+        if let Some(pid) = self.process_detector.find_kubectl_process_pid(&config)? {
           // Add to process manager to track it
           self
             .process_manager
-            .add_process(service_name.clone(), pid, config.clone())?;
+            .add_process(service_name.clone(), pid, config)?;
           synced_services.push(service_name.clone());
         }
       }
     }
 
     Ok(synced_services)
-  }
-
-  fn find_kubectl_process_pid(&self, service_name: &str) -> Result<Option<u32>> {
-    let configs = self.config_service.load_port_forwards()?;
-    let config = configs.iter().find(|c| c.name == *service_name);
-
-    if let Some(config) = config {
-      #[cfg(unix)]
-      {
-        use std::process::Command;
-
-        let output = Command::new("ps")
-          .args(["aux"])
-          .output()
-          .map_err(|e| AppError::System(format!("Failed to list processes: {}", e)))?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        for line in stdout.lines() {
-          if self.matches_kubectl_command(line, config) {
-            // Extract PID from ps output (second column)
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 2 {
-              if let Ok(pid) = parts[1].parse::<u32>() {
-                return Ok(Some(pid));
-              }
-            }
-          }
-        }
-      }
-    }
-
-    Ok(None)
   }
 }
