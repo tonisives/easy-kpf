@@ -1,5 +1,21 @@
 import { PortForwardConfig } from "./hooks"
 
+export let deriveConfigName = (
+  forwardType: "Kubectl" | "Ssh",
+  selectedService: string,
+  sshHost: string,
+  ports: string[]
+): string => {
+  if (forwardType === "Ssh") {
+    let host = sshHost.split("@").pop() || sshHost
+    let port = ports[0]?.split(":")[0] || "unknown"
+    return `${host}-${port}`
+  } else {
+    let port = ports[0]?.split(":")[0] || "unknown"
+    return `${selectedService}-${port}`
+  }
+}
+
 type FormStateProps = {
   onAdd: (config: PortForwardConfig) => void
   onUpdate?: (oldName: string, newConfig: PortForwardConfig) => void
@@ -15,19 +31,23 @@ export let useFormState = ({ onAdd, onUpdate, onClose, editingConfig }: FormStat
     e.preventDefault()
     let formData = new FormData(e.target as HTMLFormElement)
     let forwardType = formData.get("forwardType") as "Kubectl" | "Ssh"
-    
+    let providedName = formData.get("name") as string
+
     let config: PortForwardConfig
 
     if (forwardType === "Ssh") {
       let sshHost = formData.get("sshHost") as string
       let sshPort = formData.get("sshPort") as string
-      
+      let ports = [sshPort]
+
+      let derivedName = providedName || deriveConfigName(forwardType, selectedService, sshHost, ports)
+
       config = {
-        name: formData.get("name") as string,
-        context: sshHost, // Use SSH host as context for SSH mode
-        namespace: "default", // Default namespace for SSH
-        service: sshHost, // Use SSH host as service name
-        ports: [sshPort],
+        name: derivedName,
+        context: sshHost,
+        namespace: "default",
+        service: sshHost,
+        ports: ports,
         local_interface: undefined,
         forward_type: "Ssh",
       }
@@ -39,9 +59,10 @@ export let useFormState = ({ onAdd, onUpdate, onClose, editingConfig }: FormStat
         .filter((p) => p.length > 0)
 
       let localInterface = formData.get("localInterface") as string
+      let derivedName = providedName || deriveConfigName(forwardType, selectedService, "", ports)
 
       config = {
-        name: formData.get("name") as string,
+        name: derivedName,
         context: selectedContext,
         namespace: selectedNamespace,
         service: selectedService,
