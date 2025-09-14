@@ -121,16 +121,23 @@ impl PortForwardService {
       )));
     }
 
-    // Get and store current context
-    let current_context = kubectl_service.get_current_context().await?;
-
-    // Set the required context
-    kubectl_service.set_context(&config.context).await?;
+    // Only handle kubectl context for kubectl port forwards, not SSH
+    let current_context = if config.forward_type == crate::types::ForwardType::Kubectl {
+      // Get and store current context
+      let context = kubectl_service.get_current_context().await?;
+      // Set the required context
+      kubectl_service.set_context(&config.context).await?;
+      Some(context)
+    } else {
+      None
+    };
 
     let result = self.execute_port_forward(&config).await;
 
-    // Restore original context
-    let _ = kubectl_service.set_context(&current_context).await;
+    // Restore original context if we changed it
+    if let Some(original_context) = current_context {
+      let _ = kubectl_service.set_context(&original_context).await;
+    }
 
     result
   }
@@ -202,13 +209,36 @@ impl PortForwardService {
     // Format: username@host or host (assuming current user)
     let ssh_target = &config.service;
 
-    let mut ssh_args = vec!["-N"];
+    let mut ssh_args = vec![
+      "-N", // Don't execute remote command
+      "-o",
+      "BatchMode=yes", // Don't prompt for passwords
+      "-o",
+      "StrictHostKeyChecking=no", // Don't prompt for host key verification
+      "-o",
+      "ConnectTimeout=10", // 10 second connection timeout
+      "-o",
+      "ServerAliveInterval=60", // Keep connection alive
+      "-o",
+      "ServerAliveCountMax=3", // Max keep-alive attempts
+    ];
 
     // Collect port forwarding arguments first to avoid borrowing issues
     let mut forward_args = Vec::new();
     for port_mapping in &config.ports {
       let bind_interface = config.local_interface.as_deref().unwrap_or("127.0.0.1");
-      let forward_arg = format!("{}:{}", bind_interface, port_mapping);
+      // SSH -L format: [bind_address:]port:host:hostport
+      // For port mapping like "5432:5432", we want: "127.0.0.1:5432:localhost:5432"
+      let parts: Vec<&str> = port_mapping.split(':').collect();
+      let forward_arg = if parts.len() == 2 {
+        format!("{}:{}:localhost:{}", bind_interface, parts[0], parts[1])
+      } else if parts.len() == 1 {
+        // Single port means same port for local and remote
+        format!("{}:{}:localhost:{}", bind_interface, parts[0], parts[0])
+      } else {
+        // Already in correct format or custom format
+        format!("{}:{}", bind_interface, port_mapping)
+      };
       forward_args.push(forward_arg);
     }
 
@@ -219,11 +249,16 @@ impl PortForwardService {
 
     ssh_args.push(ssh_target);
 
+    log::debug!(
+      "Starting SSH port forward with command: ssh {}",
+      ssh_args.join(" ")
+    );
+
     let (_rx, child) = shell
       .command("ssh")
       .args(ssh_args)
       .spawn()
-      .map_err(|e| AppError::PortForward(e.to_string()))?;
+      .map_err(|e| AppError::PortForward(format!("Failed to start SSH: {}", e)))?;
 
     let pid = child.pid();
 
