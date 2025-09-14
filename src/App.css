@@ -1246,3 +1246,93 @@ button {
     color: #d1d5db;
   }
 }
+
+.context-accordion {
+  margin-bottom: 1.5rem;
+}
+
+.accordion-header {
+  cursor: pointer;
+  padding: 1rem 1.25rem;
+  background-color: #f8f9fa;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.accordion-header:hover {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.accordion-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.expand-icon {
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.accordion-title h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.config-count {
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: normal;
+  background-color: rgba(100, 108, 255, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  border: 1px solid rgba(100, 108, 255, 0.2);
+}
+
+.accordion-content {
+  padding-left: 1rem;
+  border-left: 2px solid #e1e5e9;
+  margin-left: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .accordion-header {
+    background-color: #374151;
+    border-color: #4b5563;
+  }
+
+  .accordion-header:hover {
+    background-color: #4b5563;
+    border-color: #6b7280;
+  }
+
+  .expand-icon {
+    color: #d1d5db;
+  }
+
+  .accordion-title h3 {
+    color: #f3f4f6;
+  }
+
+  .config-count {
+    color: #d1d5db;
+    background-color: rgba(96, 165, 250, 0.2);
+    border-color: rgba(96, 165, 250, 0.3);
+  }
+
+  .accordion-content {
+    border-left-color: #4b5563;
+  }
+}

@@ -130,8 +130,8 @@ impl PortForwardService {
 
     let kubeconfig_path = self.config_service.load_kubeconfig_path().ok().flatten();
 
-    let (command, args, env_vars) = KubectlCommandBuilder::new(kubectl_path, kubeconfig_path)
-      .build_port_forward_command(config);
+    let (command, args, env_vars) =
+      KubectlCommandBuilder::new(kubectl_path, kubeconfig_path).build_port_forward_command(config);
 
     let shell = self.app_handle.shell();
     let mut command_builder = shell.command(&command);

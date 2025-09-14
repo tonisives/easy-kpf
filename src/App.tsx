@@ -12,16 +12,16 @@ import {
   DragStartEvent,
 } from "@dnd-kit/core"
 import {
-  SortableContext,
   sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import ServiceCard from "./ServiceCard"
 import ServiceSettings from "./components/ServiceSettings"
 import AddConfigForm from "./components/AddConfigForm"
 import SetupScreen from "./components/SetupScreen"
+import ContextAccordion from "./components/ContextAccordion"
 import "./App.css"
 import { PortForwardConfig, useConfigs } from "./hooks/hooks"
+import { groupConfigsByContext } from "./utils/groupingUtils"
 
 function App() {
   let [message, setMessage] = useState("")
@@ -131,58 +131,28 @@ function App() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <SortableContext
-            items={configs.map((config) => config.name)}
-            strategy={verticalListSortingStrategy}
-          >
-            {configs.map((config) => {
-              let service = services.find((s) => s.name === config.name)
-              
-              // Format display differently for SSH vs Kubectl
-              let displayInfo = config.forward_type === "Ssh" 
-                ? {
-                    displayName: config.name,
-                    context: config.service, // SSH host
-                    namespace: config.forward_type, // Show type instead of namespace
-                    ports: `Ports: ${config.ports.join(", ")}`
-                  }
-                : {
-                    displayName: `${config.name} (${config.service})`,
-                    context: config.context,
-                    namespace: config.namespace,
-                    ports: `Ports: ${config.ports.join(", ")}`
-                  }
-              
-              return (
-                <ServiceCard
-                  key={config.name}
-                  id={config.name}
-                  name={config.name}
-                  displayName={displayInfo.displayName}
-                  context={displayInfo.context}
-                  namespace={displayInfo.namespace}
-                  ports={displayInfo.ports}
-                  isRunning={service?.running || false}
-                  isLoading={loading === config.name}
-                  error={service?.error}
-                  onStart={() => startPortForward(config.name)}
-                  onStop={() => stopPortForward(config.name)}
-                  onSettings={() => setActiveServiceSettings(config.name)}
-                  onClearError={() => clearServiceError(config.name)}
-                />
-              )
-            })}
-          </SortableContext>
+          {groupConfigsByContext(configs).map((group) => (
+            <ContextAccordion
+              key={group.context}
+              group={group}
+              services={services}
+              loading={loading}
+              onStart={startPortForward}
+              onStop={stopPortForward}
+              onSettings={setActiveServiceSettings}
+              onClearError={clearServiceError}
+            />
+          ))}
           <DragOverlay>
             {activeId
               ? (() => {
                   let config = configs.find((c) => c.name === activeId)
                   let service = services.find((s) => s.name === activeId)
-                  
+
                   if (!config) return null
-                  
+
                   // Format display differently for SSH vs Kubectl
-                  let displayInfo = config.forward_type === "Ssh" 
+                  let displayInfo = config.forward_type === "Ssh"
                     ? {
                         displayName: config.name,
                         context: config.service, // SSH host
@@ -195,7 +165,7 @@ function App() {
                         namespace: config.namespace,
                         ports: `Ports: ${config.ports.join(", ")}`
                       }
-                  
+
                   return (
                     <ServiceCard
                       id={config.name}

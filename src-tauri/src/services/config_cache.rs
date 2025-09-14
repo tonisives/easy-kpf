@@ -28,6 +28,7 @@ impl ConfigCache {
     }
   }
 
+  #[allow(dead_code)]
   pub fn with_ttl(config_service: ConfigService, ttl: Duration) -> Self {
     Self {
       config_service,
@@ -54,6 +55,7 @@ impl ConfigCache {
     Ok(configs)
   }
 
+  #[allow(dead_code)]
   pub fn invalidate(&self) {
     let mut cache_data = self.cache.lock().unwrap();
     cache_data.configs = None;
