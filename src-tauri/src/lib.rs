@@ -53,6 +53,7 @@ pub fn run() {
       verify_and_update_port_forwards,
       detect_existing_port_forwards,
       sync_with_existing_processes,
+      test_ssh_connection,
       // Kubectl handlers
       get_kubectl_contexts,
       set_kubectl_context,

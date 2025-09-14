@@ -137,15 +137,31 @@ function App() {
           >
             {configs.map((config) => {
               let service = services.find((s) => s.name === config.name)
+              
+              // Format display differently for SSH vs Kubectl
+              let displayInfo = config.forward_type === "Ssh" 
+                ? {
+                    displayName: config.name,
+                    context: config.service, // SSH host
+                    namespace: config.forward_type, // Show type instead of namespace
+                    ports: `Ports: ${config.ports.join(", ")}`
+                  }
+                : {
+                    displayName: `${config.name} (${config.service})`,
+                    context: config.context,
+                    namespace: config.namespace,
+                    ports: `Ports: ${config.ports.join(", ")}`
+                  }
+              
               return (
                 <ServiceCard
                   key={config.name}
                   id={config.name}
                   name={config.name}
-                  displayName={`${config.name} (${config.service})`}
-                  context={config.context}
-                  namespace={config.namespace}
-                  ports={`Ports: ${config.ports.join(", ")}`}
+                  displayName={displayInfo.displayName}
+                  context={displayInfo.context}
+                  namespace={displayInfo.namespace}
+                  ports={displayInfo.ports}
                   isRunning={service?.running || false}
                   isLoading={loading === config.name}
                   error={service?.error}
@@ -162,14 +178,32 @@ function App() {
               ? (() => {
                   let config = configs.find((c) => c.name === activeId)
                   let service = services.find((s) => s.name === activeId)
-                  return config ? (
+                  
+                  if (!config) return null
+                  
+                  // Format display differently for SSH vs Kubectl
+                  let displayInfo = config.forward_type === "Ssh" 
+                    ? {
+                        displayName: config.name,
+                        context: config.service, // SSH host
+                        namespace: config.forward_type, // Show type instead of namespace
+                        ports: `Ports: ${config.ports.join(", ")}`
+                      }
+                    : {
+                        displayName: `${config.name} (${config.service})`,
+                        context: config.context,
+                        namespace: config.namespace,
+                        ports: `Ports: ${config.ports.join(", ")}`
+                      }
+                  
+                  return (
                     <ServiceCard
                       id={config.name}
                       name={config.name}
-                      displayName={`${config.name} (${config.service})`}
-                      context={config.context}
-                      namespace={config.namespace}
-                      ports={`Ports: ${config.ports.join(", ")}`}
+                      displayName={displayInfo.displayName}
+                      context={displayInfo.context}
+                      namespace={displayInfo.namespace}
+                      ports={displayInfo.ports}
                       isRunning={service?.running || false}
                       isLoading={loading === config.name}
                       error={service?.error}
@@ -178,7 +212,7 @@ function App() {
                       onSettings={() => setActiveServiceSettings(config.name)}
                       onClearError={() => clearServiceError(config.name)}
                     />
-                  ) : null
+                  )
                 })()
               : null}
           </DragOverlay>
