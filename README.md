@@ -2,7 +2,7 @@
 
 A desktop application for managing Kubernetes port forwarding with a clean interface.
 
-![Main Interface](etc/images/appstore_screenshots/one_1280x800.png)
+![Main Interface](etc/images/out.gif)
 
 ## Features
 
