@@ -11,6 +11,10 @@ A desktop application for managing Kubernetes port forwarding with a clean inter
 - Drag and drop interface for organizing forwards
 - Real-time status monitoring
 - Persistent configuration storage
+- Context grouping with collapsible accordions
+- SSH port forwarding support
+- Local interface selection: 127.0.0.{x}
+- Auto-suggest names based on service/context
 - Fast app with small bundle size (13MB)
 
 ![Configuration](etc/images/appstore_screenshots/two_1280x800.png)
