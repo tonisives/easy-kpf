@@ -49,6 +49,7 @@ function App() {
     stopPortForward,
     clearServiceError,
     clearFormError,
+    reconnectAll,
   } = useConfigs(setMessage, () => {}, () => {}, () => {}, () => {})
 
   useEffect(() => {
@@ -113,6 +114,14 @@ function App() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{}}>Kubernetes Port Forwarding</h1>
         <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            onClick={() => reconnectAll()}
+            className="add-button"
+            disabled={!services.some((s) => !s.running && s.error)}
+            title="Reconnect all disconnected services"
+          >
+            Reconnect All
+          </button>
           <button onClick={() => setShowAddForm(true)} className="add-button">
             Add New Configuration
           </button>
