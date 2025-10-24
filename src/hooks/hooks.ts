@@ -283,6 +283,21 @@ export let useConfigs = (
     setFormError(undefined)
   }
 
+  let reconnectAll = async () => {
+    let disconnectedServices = services.filter((service) => {
+      let config = configs.find((c) => c.name === service.name)
+      return config && !service.running && service.error
+    })
+
+    if (disconnectedServices.length === 0) {
+      return
+    }
+
+    for (let service of disconnectedServices) {
+      await startPortForward(service.name)
+    }
+  }
+
   return {
     configs,
     services,
@@ -302,5 +317,6 @@ export let useConfigs = (
     stopPortForward,
     clearServiceError,
     clearFormError,
+    reconnectAll,
   }
 }
