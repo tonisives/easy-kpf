@@ -112,10 +112,13 @@ impl PortForwardService {
       self.interface_manager.ensure_interface_exists(interface)?;
     }
 
-    let kubectl_path = self
-      .config_service
-      .load_kubectl_path()
-      .unwrap_or_else(|_| "kubectl".to_string());
+    let kubectl_path = match self.config_service.load_kubectl_path() {
+      Ok(path) => path,
+      Err(e) => {
+        log::warn!("Failed to load kubectl path, using default: {}", e);
+        "kubectl".to_string()
+      }
+    };
 
     let kubeconfig_path = self.config_service.load_kubeconfig_path().ok().flatten();
 
@@ -144,6 +147,7 @@ impl PortForwardService {
 
     // Monitor process output in background
     let service_name = config.name.clone();
+    let process_manager = self.process_manager.clone();
     tauri::async_runtime::spawn(async move {
       use tauri_plugin_shell::process::CommandEvent;
       let mut rx = rx;
@@ -164,6 +168,8 @@ impl PortForwardService {
               service_name,
               payload.code
             );
+            // Clean up dead process from manager
+            let _ = process_manager.remove_process(&service_name);
           }
           _ => {}
         }
@@ -207,6 +213,7 @@ impl PortForwardService {
 
     // Monitor process output in background
     let service_name = config.name.clone();
+    let process_manager = self.process_manager.clone();
     tauri::async_runtime::spawn(async move {
       use tauri_plugin_shell::process::CommandEvent;
       let mut rx = rx;
@@ -227,6 +234,8 @@ impl PortForwardService {
               service_name,
               payload.code
             );
+            // Clean up dead process from manager
+            let _ = process_manager.remove_process(&service_name);
           }
           _ => {}
         }

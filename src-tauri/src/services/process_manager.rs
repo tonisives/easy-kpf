@@ -50,8 +50,13 @@ impl ProcessManager {
       let json = serde_json::to_string_pretty(&state)
         .map_err(|e| AppError::System(format!("Failed to serialize state: {}", e)))?;
 
-      std::fs::write(path, json)
-        .map_err(|e| AppError::System(format!("Failed to write state file: {}", e)))?;
+      // Atomic write: write to temp file then rename
+      let temp_path = path.with_extension("tmp");
+      std::fs::write(&temp_path, json)
+        .map_err(|e| AppError::System(format!("Failed to write temp state file: {}", e)))?;
+
+      std::fs::rename(&temp_path, path)
+        .map_err(|e| AppError::System(format!("Failed to rename state file: {}", e)))?;
 
       log::debug!("Saved process manager state to {:?}", path);
     }
@@ -76,12 +81,34 @@ impl ProcessManager {
         .lock()
         .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
 
+      let process_detector = crate::services::process_detector::ProcessDetector::new();
+      let mut loaded_count = 0;
+      let mut skipped_count = 0;
+
       for (name, serializable_info) in state.processes {
-        let process_info = ProcessInfo::from(serializable_info);
-        processes.insert(name, process_info);
+        // Verify process is still running before adding
+        if process_detector
+          .is_process_actually_running(serializable_info.pid)
+          .unwrap_or(false)
+        {
+          let process_info = ProcessInfo::from(serializable_info);
+          processes.insert(name, process_info);
+          loaded_count += 1;
+        } else {
+          log::debug!(
+            "Skipping dead process {} (PID: {})",
+            name,
+            serializable_info.pid
+          );
+          skipped_count += 1;
+        }
       }
 
-      log::info!("Loaded {} processes from state file", processes.len());
+      log::info!(
+        "Loaded {} active processes from state file ({} dead processes skipped)",
+        loaded_count,
+        skipped_count
+      );
     }
     Ok(())
   }

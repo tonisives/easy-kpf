@@ -17,14 +17,19 @@ impl KubectlCommandBuilder {
     &self,
     config: &PortForwardConfig,
   ) -> (String, Vec<String>, Vec<(String, String)>) {
-    let mut args = vec![
-      "--context".to_string(),
-      config.context.clone(),
+    let mut args = vec![];
+
+    // Add context flag only if context is not empty
+    if !config.context.is_empty() {
+      args.extend_from_slice(&["--context".to_string(), config.context.clone()]);
+    }
+
+    args.extend_from_slice(&[
       "-n".to_string(),
       config.namespace.clone(),
       "port-forward".to_string(),
       config.service.clone(),
-    ];
+    ]);
 
     // Add --address flag if local interface is specified
     if let Some(ref interface) = config.local_interface {
