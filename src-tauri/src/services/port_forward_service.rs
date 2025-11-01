@@ -147,7 +147,6 @@ impl PortForwardService {
 
     // Monitor process output in background
     let service_name = config.name.clone();
-    let process_manager = self.process_manager.clone();
     tauri::async_runtime::spawn(async move {
       use tauri_plugin_shell::process::CommandEvent;
       let mut rx = rx;
@@ -164,12 +163,12 @@ impl PortForwardService {
           }
           CommandEvent::Terminated(payload) => {
             log::warn!(
-              "[{}] Process terminated with code: {:?}",
+              "[{}] Process terminated with code: {:?}. Will be cleaned up by verification cycle.",
               service_name,
               payload.code
             );
-            // Clean up dead process from manager
-            let _ = process_manager.remove_process(&service_name);
+            // Don't remove here - let verify_port_forwards() handle cleanup
+            // so the frontend gets properly notified via verify_and_update_port_forwards
           }
           _ => {}
         }
@@ -213,7 +212,6 @@ impl PortForwardService {
 
     // Monitor process output in background
     let service_name = config.name.clone();
-    let process_manager = self.process_manager.clone();
     tauri::async_runtime::spawn(async move {
       use tauri_plugin_shell::process::CommandEvent;
       let mut rx = rx;
@@ -230,12 +228,12 @@ impl PortForwardService {
           }
           CommandEvent::Terminated(payload) => {
             log::warn!(
-              "[{}] Process terminated with code: {:?}",
+              "[{}] Process terminated with code: {:?}. Will be cleaned up by verification cycle.",
               service_name,
               payload.code
             );
-            // Clean up dead process from manager
-            let _ = process_manager.remove_process(&service_name);
+            // Don't remove here - let verify_port_forwards() handle cleanup
+            // so the frontend gets properly notified via verify_and_update_port_forwards
           }
           _ => {}
         }
