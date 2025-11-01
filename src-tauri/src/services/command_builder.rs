@@ -18,6 +18,8 @@ impl KubectlCommandBuilder {
     config: &PortForwardConfig,
   ) -> (String, Vec<String>, Vec<(String, String)>) {
     let mut args = vec![
+      "--context".to_string(),
+      config.context.clone(),
       "-n".to_string(),
       config.namespace.clone(),
       "port-forward".to_string(),

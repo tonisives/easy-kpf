@@ -1,44 +1,123 @@
 use crate::error::{AppError, Result};
-use crate::types::{PortForwardConfig, ProcessInfo};
+use crate::types::{PortForwardConfig, ProcessInfo, ProcessManagerState, SerializableProcessInfo};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 #[derive(Clone)]
 pub struct ProcessManager {
   processes: Arc<Mutex<HashMap<String, ProcessInfo>>>,
+  state_file_path: Option<PathBuf>,
 }
 
 impl ProcessManager {
   pub fn new() -> Self {
     Self {
       processes: Arc::new(Mutex::new(HashMap::new())),
+      state_file_path: None,
     }
   }
 
-  pub fn add_process(&self, name: String, pid: u32, config: PortForwardConfig) -> Result<()> {
-    let mut processes = self
-      .processes
-      .lock()
-      .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
-
-    let process_info = ProcessInfo {
-      pid,
-      config,
-      started_at: Instant::now(),
+  pub fn with_state_file(state_file_path: PathBuf) -> Self {
+    let manager = Self {
+      processes: Arc::new(Mutex::new(HashMap::new())),
+      state_file_path: Some(state_file_path),
     };
 
-    processes.insert(name, process_info);
+    // Try to load existing state
+    if let Err(e) = manager.load_state() {
+      log::warn!("Failed to load process manager state: {}", e);
+    }
+
+    manager
+  }
+
+  fn save_state(&self) -> Result<()> {
+    if let Some(ref path) = self.state_file_path {
+      let processes = self
+        .processes
+        .lock()
+        .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
+
+      let state = ProcessManagerState {
+        processes: processes
+          .iter()
+          .map(|(name, info)| (name.clone(), SerializableProcessInfo::from(info)))
+          .collect(),
+      };
+
+      let json = serde_json::to_string_pretty(&state)
+        .map_err(|e| AppError::System(format!("Failed to serialize state: {}", e)))?;
+
+      std::fs::write(path, json)
+        .map_err(|e| AppError::System(format!("Failed to write state file: {}", e)))?;
+
+      log::debug!("Saved process manager state to {:?}", path);
+    }
+    Ok(())
+  }
+
+  fn load_state(&self) -> Result<()> {
+    if let Some(ref path) = self.state_file_path {
+      if !path.exists() {
+        log::debug!("No existing state file found at {:?}", path);
+        return Ok(());
+      }
+
+      let json = std::fs::read_to_string(path)
+        .map_err(|e| AppError::System(format!("Failed to read state file: {}", e)))?;
+
+      let state: ProcessManagerState = serde_json::from_str(&json)
+        .map_err(|e| AppError::System(format!("Failed to deserialize state: {}", e)))?;
+
+      let mut processes = self
+        .processes
+        .lock()
+        .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
+
+      for (name, serializable_info) in state.processes {
+        let process_info = ProcessInfo::from(serializable_info);
+        processes.insert(name, process_info);
+      }
+
+      log::info!("Loaded {} processes from state file", processes.len());
+    }
+    Ok(())
+  }
+
+  pub fn add_process(&self, name: String, pid: u32, config: PortForwardConfig) -> Result<()> {
+    {
+      let mut processes = self
+        .processes
+        .lock()
+        .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
+
+      let process_info = ProcessInfo {
+        pid,
+        config,
+        started_at: Instant::now(),
+      };
+
+      processes.insert(name, process_info);
+    }
+
+    self.save_state()?;
     Ok(())
   }
 
   pub fn remove_process(&self, name: &str) -> Result<Option<u32>> {
-    let mut processes = self
-      .processes
-      .lock()
-      .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
+    let result = {
+      let mut processes = self
+        .processes
+        .lock()
+        .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
 
-    Ok(processes.remove(name).map(|info| info.pid))
+      processes.remove(name).map(|info| info.pid)
+    };
+
+    self.save_state()?;
+    Ok(result)
   }
 
   #[allow(dead_code)]
@@ -84,28 +163,35 @@ impl ProcessManager {
   }
 
   pub fn update_process_name(&self, old_name: &str, new_name: String) -> Result<()> {
-    let mut processes = self
-      .processes
-      .lock()
-      .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
+    {
+      let mut processes = self
+        .processes
+        .lock()
+        .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
 
-    if let Some(mut process_info) = processes.remove(old_name) {
-      process_info.config.name = new_name.clone();
-      processes.insert(new_name, process_info);
+      if let Some(mut process_info) = processes.remove(old_name) {
+        process_info.config.name = new_name.clone();
+        processes.insert(new_name, process_info);
+      }
     }
 
+    self.save_state()?;
     Ok(())
   }
 
   pub fn cleanup_all(&self) -> Result<Vec<u32>> {
-    let mut processes = self
-      .processes
-      .lock()
-      .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
+    let pids = {
+      let mut processes = self
+        .processes
+        .lock()
+        .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
 
-    let pids: Vec<u32> = processes.values().map(|info| info.pid).collect();
-    processes.clear();
+      let pids: Vec<u32> = processes.values().map(|info| info.pid).collect();
+      processes.clear();
+      pids
+    };
 
+    self.save_state()?;
     Ok(pids)
   }
 

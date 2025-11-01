@@ -21,7 +21,15 @@ pub fn run() {
   init_logging();
 
   let config_service = ConfigService::new().expect("Failed to initialize config service");
-  let process_manager = ProcessManager::new();
+
+  // Initialize ProcessManager with persistent state file
+  let process_manager = {
+    let state_path = dirs::config_dir()
+      .expect("Could not find config directory")
+      .join("EasyKpf")
+      .join("process-state.json");
+    ProcessManager::with_state_file(state_path)
+  };
 
   tauri::Builder::default()
     .plugin(tauri_plugin_opener::init())

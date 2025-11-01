@@ -35,7 +35,37 @@ pub struct ProcessInfo {
   pub started_at: Instant,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializableProcessInfo {
+  pub pid: u32,
+  pub config: PortForwardConfig,
+}
+
+impl From<&ProcessInfo> for SerializableProcessInfo {
+  fn from(info: &ProcessInfo) -> Self {
+    Self {
+      pid: info.pid,
+      config: info.config.clone(),
+    }
+  }
+}
+
+impl From<SerializableProcessInfo> for ProcessInfo {
+  fn from(info: SerializableProcessInfo) -> Self {
+    Self {
+      pid: info.pid,
+      config: info.config,
+      started_at: Instant::now(),
+    }
+  }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PortForwardConfigs {
   pub configs: Vec<PortForwardConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ProcessManagerState {
+  pub processes: std::collections::HashMap<String, SerializableProcessInfo>,
 }

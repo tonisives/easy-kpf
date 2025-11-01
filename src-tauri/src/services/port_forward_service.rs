@@ -78,7 +78,7 @@ impl PortForwardService {
 
   pub async fn start_port_forward_generic<K: KubectlOperations>(
     &self,
-    kubectl_service: &K,
+    _kubectl_service: &K,
     config: PortForwardConfig,
   ) -> Result<String> {
     // Check if already running
@@ -89,25 +89,14 @@ impl PortForwardService {
       )));
     }
 
-    // Only handle kubectl context for kubectl port forwards, not SSH
-    let current_context = if config.forward_type == crate::types::ForwardType::Kubectl {
-      // Get and store current context
-      let context = kubectl_service.get_current_context().await?;
-      // Set the required context
-      kubectl_service.set_context(&config.context).await?;
-      Some(context)
-    } else {
-      None
-    };
+    // No need to switch contexts - we use --context flag in the kubectl command
+    log::info!(
+      "Starting port forward for {} in context {}",
+      config.name,
+      config.context
+    );
 
-    let result = self.execute_port_forward(&config).await;
-
-    // Restore original context if we changed it
-    if let Some(original_context) = current_context {
-      let _ = kubectl_service.set_context(&original_context).await;
-    }
-
-    result
+    self.execute_port_forward(&config).await
   }
 
   async fn execute_port_forward(&self, config: &PortForwardConfig) -> Result<String> {
@@ -141,7 +130,7 @@ impl PortForwardService {
       command_builder = command_builder.env(key, value);
     }
 
-    let (_rx, child) = command_builder
+    let (rx, child) = command_builder
       .args(args)
       .spawn()
       .map_err(|e| AppError::PortForward(e.to_string()))?;
@@ -152,6 +141,34 @@ impl PortForwardService {
     self
       .process_manager
       .add_process(config.name.clone(), pid, config.clone())?;
+
+    // Monitor process output in background
+    let service_name = config.name.clone();
+    tauri::async_runtime::spawn(async move {
+      use tauri_plugin_shell::process::CommandEvent;
+      let mut rx = rx;
+      while let Some(event) = rx.recv().await {
+        match event {
+          CommandEvent::Stdout(line) => {
+            log::info!("[{}] {}", service_name, String::from_utf8_lossy(&line));
+          }
+          CommandEvent::Stderr(line) => {
+            log::error!("[{}] {}", service_name, String::from_utf8_lossy(&line));
+          }
+          CommandEvent::Error(err) => {
+            log::error!("[{}] Process error: {}", service_name, err);
+          }
+          CommandEvent::Terminated(payload) => {
+            log::warn!(
+              "[{}] Process terminated with code: {:?}",
+              service_name,
+              payload.code
+            );
+          }
+          _ => {}
+        }
+      }
+    });
 
     Ok(format!(
       "{} kubectl port forwarding started with PID: {}",
@@ -175,7 +192,7 @@ impl PortForwardService {
     );
 
     let shell = self.app_handle.shell();
-    let (_rx, child) = shell
+    let (rx, child) = shell
       .command(&command)
       .args(args)
       .spawn()
@@ -187,6 +204,34 @@ impl PortForwardService {
     self
       .process_manager
       .add_process(config.name.clone(), pid, config.clone())?;
+
+    // Monitor process output in background
+    let service_name = config.name.clone();
+    tauri::async_runtime::spawn(async move {
+      use tauri_plugin_shell::process::CommandEvent;
+      let mut rx = rx;
+      while let Some(event) = rx.recv().await {
+        match event {
+          CommandEvent::Stdout(line) => {
+            log::info!("[{}] {}", service_name, String::from_utf8_lossy(&line));
+          }
+          CommandEvent::Stderr(line) => {
+            log::error!("[{}] {}", service_name, String::from_utf8_lossy(&line));
+          }
+          CommandEvent::Error(err) => {
+            log::error!("[{}] Process error: {}", service_name, err);
+          }
+          CommandEvent::Terminated(payload) => {
+            log::warn!(
+              "[{}] Process terminated with code: {:?}",
+              service_name,
+              payload.code
+            );
+          }
+          _ => {}
+        }
+      }
+    });
 
     Ok(format!(
       "{} SSH port forwarding started with PID: {}",
@@ -202,7 +247,11 @@ impl PortForwardService {
         AppError::NotFound(format!("{} port forwarding is not running", service_name))
       })?;
 
+    log::info!("[{}] Stopping port forward (PID: {})", service_name, pid);
+
     ProcessManager::kill_process(pid)?;
+
+    log::info!("[{}] Port forward stopped successfully", service_name);
 
     Ok(format!(
       "Stopped {} port forwarding (PID: {})",
@@ -231,6 +280,11 @@ impl PortForwardService {
     for (service_name, pid) in running_services {
       let is_actually_running = self.process_detector.is_process_actually_running(pid)?;
       if !is_actually_running {
+        log::error!(
+          "[{}] Port forward process (PID: {}) died unexpectedly. Process is no longer running.",
+          service_name,
+          pid
+        );
         // Clean up dead process
         let _ = self.process_manager.remove_process(&service_name);
       }
