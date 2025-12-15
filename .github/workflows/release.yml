@@ -173,6 +173,7 @@ jobs:
           DMG_PATH=$(find target -name "*.dmg" -type f 2>/dev/null | head -1)
           if [ -n "$DMG_PATH" ]; then
             NEW_NAME="EasyKpf_${{ matrix.arch }}.dmg"
-            # Upload with new name to the release
-            gh release upload "${{ github.ref_name }}" "$DMG_PATH" --clobber --repo "${{ github.repository }}" -n "$NEW_NAME"
+            # Copy to new name and upload
+            cp "$DMG_PATH" "$NEW_NAME"
+            gh release upload "${{ github.ref_name }}" "$NEW_NAME" --clobber --repo "${{ github.repository }}"
           fi
