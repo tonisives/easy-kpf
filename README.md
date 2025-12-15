@@ -30,10 +30,16 @@ A desktop application for managing Kubernetes port forwarding with a clean inter
 
 Built with Tauri (Rust + React). Cross-platform support for macOS, Windows, and Linux.
 
-### macOS (Homebrew)
+### GUI App - macOS (Homebrew)
 
 ```bash
-brew install tonisives/tap/easy-kpf
+brew install --cask tonisives/tap/easy-kpf
+```
+
+### CLI/TUI - macOS/Linux (Homebrew)
+
+```bash
+brew install tonisives/tap/easykpf
 ```
 
 ### Manual Download
