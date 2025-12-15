@@ -1,3 +1,4 @@
 appstore_screenshots
 *.png
+!tui/*.png
 

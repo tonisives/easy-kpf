@@ -17,9 +17,18 @@ fn parse_local_port(port_mapping: &str) -> Option<u16> {
 /// Check if running as root/sudo
 #[allow(unsafe_code)]
 fn is_running_as_root() -> bool {
-  // SAFETY: libc::getuid() is always safe to call - it simply returns
-  // the real user ID of the calling process with no side effects.
-  unsafe { libc::getuid() == 0 }
+  #[cfg(unix)]
+  {
+    // SAFETY: libc::getuid() is always safe to call - it simply returns
+    // the real user ID of the calling process with no side effects.
+    unsafe { libc::getuid() == 0 }
+  }
+  #[cfg(windows)]
+  {
+    // On Windows, privileged port restrictions don't apply the same way
+    // Return true to skip the privileged port warning
+    true
+  }
 }
 
 /// Find any privileged ports (< 1024) in the config

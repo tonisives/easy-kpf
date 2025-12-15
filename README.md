@@ -1,25 +1,49 @@
 # Easy KPF - Kubernetes Port Forward Manager
 
-A desktop application for managing Kubernetes port forwarding with a clean interface.
+A tool for managing Kubernetes port forwarding. Available as both a **GUI desktop app** and a **TUI terminal app** with feature parity.
 
-![Main Interface](etc/images/out.gif)
+<table>
+<tr>
+<td width="50%" align="center"><strong>GUI (Desktop)</strong></td>
+<td width="50%" align="center"><strong>TUI (Terminal)</strong></td>
+</tr>
+<tr>
+<td><img src="etc/images/out.gif" alt="GUI Demo"/></td>
+<td><img src="etc/images/tui/demo-easy-kpf.gif" alt="TUI Demo"/></td>
+</tr>
+</table>
 
 ## Features
 
 - Visual port forwarding management
 - Support for multiple Kubernetes contexts
-- Drag and drop interface for organizing forwards
 - Real-time status monitoring
 - Persistent configuration storage
-- Context grouping with collapsible accordions
+- Context grouping with collapsible sections
 - SSH port forwarding support
 - Local interface selection: 127.0.0.{x}
 - Auto-suggest names based on service/context
-- Fast app with small bundle size (13MB)
+- Search and filter configs
+- Shared configuration between GUI and TUI
 
-![Configuration](etc/images/appstore_screenshots/two_1280x800.png)
-
-![Port Forwards](etc/images/appstore_screenshots/three_1280x800.png)
+<table>
+<tr>
+<td width="50%" align="center"><strong>GUI</strong></td>
+<td width="50%" align="center"><strong>TUI</strong></td>
+</tr>
+<tr>
+<td><img src="etc/images/appstore_screenshots/one_1280x800.png" alt="GUI Main View"/></td>
+<td><img src="etc/images/tui/1-view-and-start.png" alt="TUI Main View"/></td>
+</tr>
+<tr>
+<td><img src="etc/images/appstore_screenshots/two_1280x800.png" alt="GUI Configuration"/></td>
+<td><img src="etc/images/tui/2-add-config.png" alt="TUI Add Config"/></td>
+</tr>
+<tr>
+<td><img src="etc/images/appstore_screenshots/three_1280x800.png" alt="GUI Port Forwards"/></td>
+<td><img src="etc/images/tui/3-visual-select.png" alt="TUI Visual Select"/></td>
+</tr>
+</table>
 
 ## Requirements
 
