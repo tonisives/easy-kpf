@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "crates/easy-kpf-core",
+    "crates/easy-kpf-cli",
+    "crates/easy-kpf-tauri",
+]
+resolver = "2"

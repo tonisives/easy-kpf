@@ -16,12 +16,16 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
+            arch: 'aarch64'
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
+            arch: 'x64'
           - platform: 'ubuntu-22.04'
             args: ''
+            arch: ''
           - platform: 'windows-latest'
             args: ''
+            arch: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -67,6 +71,7 @@ jobs:
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Build the app
+        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -83,3 +88,16 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Rename macOS DMG for Homebrew
+        if: matrix.platform == 'macos-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find the DMG file in the artifacts
+          DMG_PATH=$(find src-tauri/target -name "*.dmg" -type f 2>/dev/null | head -1)
+          if [ -n "$DMG_PATH" ]; then
+            NEW_NAME="EasyKpf_${{ matrix.arch }}.dmg"
+            # Upload with new name to the release
+            gh release upload "${{ github.ref_name }}" "$DMG_PATH" --clobber --repo "${{ github.repository }}" -n "$NEW_NAME"
+          fi

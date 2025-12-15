@@ -1,0 +1,22 @@
+[package]
+name = "easy-kpf-cli"
+version = "0.1.0"
+description = "Easy KPF - CLI/TUI for kubectl port forward management"
+authors = ["you"]
+edition = "2021"
+
+[[bin]]
+name = "easykpf"
+path = "src/main.rs"
+
+[dependencies]
+easy-kpf-core = { path = "../easy-kpf-core" }
+tokio = { version = "1", features = ["full"] }
+ratatui = "0.29"
+crossterm = "0.28"
+tui-input = "0.10"
+unicode-width = "0.2"
+log = "0.4"
+env_logger = "0.10"
+async-trait = "0.1"
+anyhow = "1.0"
