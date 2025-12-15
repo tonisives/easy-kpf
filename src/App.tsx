@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import {
   DndContext,
@@ -36,6 +36,9 @@ function App() {
     index: number
   } | null>(null)
   let [activeId, setActiveId] = useState<string | null>(null)
+  let [searchQuery, setSearchQuery] = useState("")
+  let [searchFocused, setSearchFocused] = useState(false)
+  let searchInputRef = useRef<HTMLInputElement>(null)
   let {
     configs,
     services,
@@ -63,6 +66,56 @@ function App() {
     }
     checkKubectlSetup()
   }, [])
+
+  // Keyboard shortcut for search (/ or Cmd+F)
+  useEffect(() => {
+    let handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if we're in an input, textarea, or contenteditable
+      let target = e.target as HTMLElement
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        // Allow Escape to blur the search input
+        if (e.key === "Escape" && target === searchInputRef.current) {
+          searchInputRef.current?.blur()
+          setSearchFocused(false)
+        }
+        return
+      }
+
+      // / or Cmd+F to focus search
+      if (e.key === "/" || (e.key === "f" && (e.metaKey || e.ctrlKey))) {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        setSearchFocused(true)
+      }
+
+      // Escape to clear search when not focused
+      if (e.key === "Escape" && searchQuery) {
+        setSearchQuery("")
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [searchQuery])
+
+  // Filter configs based on search query
+  let filteredConfigs = useMemo(() => {
+    if (!searchQuery.trim()) return configs
+
+    let query = searchQuery.toLowerCase()
+    return configs.filter(
+      (c) =>
+        c.name.toLowerCase().includes(query) ||
+        c.service.toLowerCase().includes(query) ||
+        c.namespace.toLowerCase().includes(query) ||
+        c.context.toLowerCase().includes(query) ||
+        c.ports.some((p) => p.includes(query))
+    )
+  }, [configs, searchQuery])
 
   let sensors = useSensors(
     useSensor(PointerSensor),
@@ -131,7 +184,38 @@ function App() {
         </div>
       </div>
 
-      <div style={{ height: "20px" }} />
+      <div className="search-container">
+        <div className={`search-input-wrapper ${searchFocused ? "focused" : ""}`}>
+          <span className="search-icon">⌕</span>
+          <input
+            ref={searchInputRef}
+            type="text"
+            className="search-input"
+            placeholder="Filter port forwards... (/ or Cmd+F)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+          />
+          {searchQuery && (
+            <button
+              className="search-clear"
+              onClick={() => {
+                setSearchQuery("")
+                searchInputRef.current?.focus()
+              }}
+              title="Clear search (Esc)"
+            >
+              x
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <span className="search-results-count">
+            {filteredConfigs.length} of {configs.length} shown
+          </span>
+        )}
+      </div>
 
       <div className="services-section">
         <DndContext
@@ -140,7 +224,7 @@ function App() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          {groupConfigsByContext(configs).map((group) => (
+          {groupConfigsByContext(filteredConfigs).map((group) => (
             <ContextAccordion
               key={group.context}
               group={group}

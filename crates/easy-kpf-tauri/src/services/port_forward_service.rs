@@ -1,0 +1,352 @@
+use easy_kpf_core::error::{AppError, Result};
+use easy_kpf_core::services::{
+  ConfigCache, ConfigService, InterfaceManager, KubectlCommandBuilder, ProcessDetector,
+  ProcessManager, SshCommandBuilder, SystemInterfaceManager,
+};
+use easy_kpf_core::types::{ForwardType, PortForwardConfig};
+
+use super::KubectlOperations;
+use tauri_plugin_shell::ShellExt;
+
+pub struct PortForwardService {
+  app_handle: tauri::AppHandle,
+  config_cache: ConfigCache,
+  config_service: ConfigService,
+  process_manager: ProcessManager,
+  interface_manager: SystemInterfaceManager,
+  process_detector: ProcessDetector,
+}
+
+impl PortForwardService {
+  pub fn new(
+    app_handle: tauri::AppHandle,
+    config_service: ConfigService,
+    process_manager: ProcessManager,
+  ) -> Self {
+    Self {
+      app_handle,
+      config_cache: ConfigCache::new(config_service.clone()),
+      config_service,
+      process_manager,
+      interface_manager: SystemInterfaceManager,
+      process_detector: ProcessDetector::new(),
+    }
+  }
+
+  pub fn get_configs(&self) -> Result<Vec<PortForwardConfig>> {
+    self.config_cache.get_configs()
+  }
+
+  pub fn add_config(&self, config: PortForwardConfig) -> Result<()> {
+    self.config_cache.add_config(config)
+  }
+
+  pub fn remove_config(&self, service_key: &str) -> Result<()> {
+    self.config_cache.remove_config(service_key)
+  }
+
+  pub fn update_config(&self, old_service_key: &str, new_config: PortForwardConfig) -> Result<()> {
+    // If the service name changed, update the process manager
+    if old_service_key != new_config.name {
+      self
+        .process_manager
+        .update_process_name(old_service_key, new_config.name.clone())?;
+    }
+
+    self.config_cache.update_config(old_service_key, new_config)
+  }
+
+  pub fn reorder_config(&self, service_key: &str, new_index: usize) -> Result<()> {
+    self.config_cache.reorder_config(service_key, new_index)
+  }
+
+  pub async fn start_port_forward_by_key<K: KubectlOperations>(
+    &self,
+    kubectl_service: &K,
+    service_key: &str,
+  ) -> Result<String> {
+    let config = self.config_cache.find_config(service_key)?.ok_or_else(|| {
+      AppError::NotFound(format!(
+        "Configuration not found for service: {}",
+        service_key
+      ))
+    })?;
+
+    self
+      .start_port_forward_generic(kubectl_service, config)
+      .await
+  }
+
+  pub async fn start_port_forward_generic<K: KubectlOperations>(
+    &self,
+    _kubectl_service: &K,
+    config: PortForwardConfig,
+  ) -> Result<String> {
+    // Check if already running
+    if self.process_manager.contains_process(&config.name)? {
+      return Err(AppError::PortForward(format!(
+        "{} port forwarding is already running",
+        config.name
+      )));
+    }
+
+    // No need to switch contexts - we use --context flag in the kubectl command
+    log::info!(
+      "Starting port forward for {} in context {}",
+      config.name,
+      config.context
+    );
+
+    self.execute_port_forward(&config).await
+  }
+
+  async fn execute_port_forward(&self, config: &PortForwardConfig) -> Result<String> {
+    match config.forward_type {
+      ForwardType::Kubectl => self.execute_kubectl_port_forward(config).await,
+      ForwardType::Ssh => self.execute_ssh_port_forward(config).await,
+    }
+  }
+
+  async fn execute_kubectl_port_forward(&self, config: &PortForwardConfig) -> Result<String> {
+    // Create local interface if specified and doesn't exist
+    if let Some(ref interface) = config.local_interface {
+      self.interface_manager.ensure_interface_exists(interface)?;
+    }
+
+    let kubectl_path = match self.config_service.load_kubectl_path() {
+      Ok(path) => path,
+      Err(e) => {
+        log::warn!("Failed to load kubectl path, using default: {}", e);
+        "kubectl".to_string()
+      }
+    };
+
+    let kubeconfig_path = self.config_service.load_kubeconfig_path().ok().flatten();
+
+    let (command, args, env_vars) =
+      KubectlCommandBuilder::new(kubectl_path, kubeconfig_path).build_port_forward_command(config);
+
+    let shell = self.app_handle.shell();
+    let mut command_builder = shell.command(&command);
+
+    // Set environment variables
+    for (key, value) in env_vars {
+      command_builder = command_builder.env(key, value);
+    }
+
+    let (rx, child) = command_builder
+      .args(args)
+      .spawn()
+      .map_err(|e| AppError::PortForward(e.to_string()))?;
+
+    let pid = child.pid();
+
+    // Add to process manager
+    self
+      .process_manager
+      .add_process(config.name.clone(), pid, config.clone())?;
+
+    // Monitor process output in background
+    let service_name = config.name.clone();
+    tauri::async_runtime::spawn(async move {
+      use tauri_plugin_shell::process::CommandEvent;
+      let mut rx = rx;
+      while let Some(event) = rx.recv().await {
+        match event {
+          CommandEvent::Stdout(line) => {
+            log::info!("[{}] {}", service_name, String::from_utf8_lossy(&line));
+          }
+          CommandEvent::Stderr(line) => {
+            log::error!("[{}] {}", service_name, String::from_utf8_lossy(&line));
+          }
+          CommandEvent::Error(err) => {
+            log::error!("[{}] Process error: {}", service_name, err);
+          }
+          CommandEvent::Terminated(payload) => {
+            log::warn!(
+              "[{}] Process terminated with code: {:?}. Will be cleaned up by verification cycle.",
+              service_name,
+              payload.code
+            );
+            // Don't remove here - let verify_port_forwards() handle cleanup
+            // so the frontend gets properly notified via verify_and_update_port_forwards
+          }
+          _ => {}
+        }
+      }
+    });
+
+    Ok(format!(
+      "{} kubectl port forwarding started with PID: {}",
+      config.name, pid
+    ))
+  }
+
+  async fn execute_ssh_port_forward(&self, config: &PortForwardConfig) -> Result<String> {
+    // Create local interface if specified and doesn't exist
+    if let Some(ref interface) = config.local_interface {
+      self.interface_manager.ensure_interface_exists(interface)?;
+    }
+
+    let ssh_builder = SshCommandBuilder::new();
+    let (command, args) = ssh_builder.build_port_forward_command(config);
+
+    log::debug!(
+      "Starting SSH port forward with command: {} {}",
+      command,
+      args.join(" ")
+    );
+
+    let shell = self.app_handle.shell();
+    let (rx, child) = shell
+      .command(&command)
+      .args(args)
+      .spawn()
+      .map_err(|e| AppError::PortForward(format!("Failed to start SSH: {}", e)))?;
+
+    let pid = child.pid();
+
+    // Add to process manager
+    self
+      .process_manager
+      .add_process(config.name.clone(), pid, config.clone())?;
+
+    // Monitor process output in background
+    let service_name = config.name.clone();
+    tauri::async_runtime::spawn(async move {
+      use tauri_plugin_shell::process::CommandEvent;
+      let mut rx = rx;
+      while let Some(event) = rx.recv().await {
+        match event {
+          CommandEvent::Stdout(line) => {
+            log::info!("[{}] {}", service_name, String::from_utf8_lossy(&line));
+          }
+          CommandEvent::Stderr(line) => {
+            log::error!("[{}] {}", service_name, String::from_utf8_lossy(&line));
+          }
+          CommandEvent::Error(err) => {
+            log::error!("[{}] Process error: {}", service_name, err);
+          }
+          CommandEvent::Terminated(payload) => {
+            log::warn!(
+              "[{}] Process terminated with code: {:?}. Will be cleaned up by verification cycle.",
+              service_name,
+              payload.code
+            );
+            // Don't remove here - let verify_port_forwards() handle cleanup
+            // so the frontend gets properly notified via verify_and_update_port_forwards
+          }
+          _ => {}
+        }
+      }
+    });
+
+    Ok(format!(
+      "{} SSH port forwarding started with PID: {}",
+      config.name, pid
+    ))
+  }
+
+  pub fn stop_port_forward(&self, service_name: &str) -> Result<String> {
+    let pid = self
+      .process_manager
+      .remove_process(service_name)?
+      .ok_or_else(|| {
+        AppError::NotFound(format!("{} port forwarding is not running", service_name))
+      })?;
+
+    log::info!("[{}] Stopping port forward (PID: {})", service_name, pid);
+
+    ProcessManager::kill_process(pid)?;
+
+    log::info!("[{}] Port forward stopped successfully", service_name);
+
+    Ok(format!(
+      "Stopped {} port forwarding (PID: {})",
+      service_name, pid
+    ))
+  }
+
+  pub fn get_running_services(&self) -> Result<Vec<String>> {
+    self.process_manager.get_running_services()
+  }
+
+  pub fn cleanup_all_port_forwards(&self) -> Result<()> {
+    let pids = self.process_manager.cleanup_all()?;
+
+    for pid in pids {
+      let _ = ProcessManager::kill_process(pid);
+    }
+
+    Ok(())
+  }
+
+  pub fn verify_port_forwards(&self) -> Result<Vec<(String, bool)>> {
+    let running_services = self.process_manager.get_running_services_with_pids()?;
+    let mut results = Vec::new();
+
+    for (service_name, pid) in running_services {
+      let is_actually_running = self.process_detector.is_process_actually_running(pid)?;
+      if !is_actually_running {
+        log::error!(
+          "[{}] Port forward process (PID: {}) died unexpectedly. Process is no longer running.",
+          service_name,
+          pid
+        );
+        // Clean up dead process
+        let _ = self.process_manager.remove_process(&service_name);
+      }
+      results.push((service_name, is_actually_running));
+    }
+
+    Ok(results)
+  }
+
+  pub fn verify_and_update_port_forwards(&self) -> Result<Vec<String>> {
+    let verification_results = self.verify_port_forwards()?;
+    let mut stopped_services = Vec::new();
+
+    for (service_name, is_running) in verification_results {
+      if !is_running {
+        stopped_services.push(service_name);
+      }
+    }
+
+    Ok(stopped_services)
+  }
+
+  pub fn detect_existing_port_forwards(&self) -> Result<Vec<String>> {
+    let configs = self.config_cache.get_configs()?;
+    let mut detected_services = Vec::new();
+
+    for config in &configs {
+      if self.process_detector.is_kubectl_process_running(config)?
+        && !self.process_manager.contains_process(&config.name)?
+      {
+        detected_services.push(config.name.clone());
+      }
+    }
+
+    Ok(detected_services)
+  }
+
+  pub fn sync_with_existing_processes(&self) -> Result<Vec<String>> {
+    let detected = self.detect_existing_port_forwards()?;
+    let mut synced_services = Vec::new();
+
+    for service_name in &detected {
+      let config = self.config_cache.find_config(service_name)?;
+      if let Some(config) = config {
+        if let Some(pid) = self.process_detector.find_kubectl_process_pid(&config)? {
+          // Add to process manager to track it
+          self
+            .process_manager
+            .add_process(service_name.clone(), pid, config)?;
+          synced_services.push(service_name.clone());
+        }
+      }
+    }
+
+    Ok(synced_services)
+  }
+}

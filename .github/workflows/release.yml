@@ -7,7 +7,76 @@ on:
   workflow_dispatch:
 
 jobs:
-  release:
+  # Build CLI binaries
+  cli:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            target: 'aarch64-apple-darwin'
+            artifact_name: 'easykpf-macos-aarch64'
+          - platform: 'macos-latest'
+            target: 'x86_64-apple-darwin'
+            artifact_name: 'easykpf-macos-x86_64'
+          - platform: 'ubuntu-22.04'
+            target: 'x86_64-unknown-linux-gnu'
+            artifact_name: 'easykpf-linux-x86_64'
+          - platform: 'windows-latest'
+            target: 'x86_64-pc-windows-msvc'
+            artifact_name: 'easykpf-windows-x86_64'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Update version if release starts with 'v'
+        shell: bash
+        run: ./etc/update-version.sh "${{ github.ref_name }}"
+
+      - name: Build CLI
+        run: cargo build --release --package easy-kpf-cli --target ${{ matrix.target }}
+
+      - name: Prepare artifact (Unix)
+        if: matrix.platform != 'windows-latest'
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/easykpf dist/${{ matrix.artifact_name }}
+          chmod +x dist/${{ matrix.artifact_name }}
+          cd dist && tar -czvf ${{ matrix.artifact_name }}.tar.gz ${{ matrix.artifact_name }}
+
+      - name: Prepare artifact (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item "target/${{ matrix.target }}/release/easykpf.exe" "dist/${{ matrix.artifact_name }}.exe"
+          Compress-Archive -Path "dist/${{ matrix.artifact_name }}.exe" -DestinationPath "dist/${{ matrix.artifact_name }}.zip"
+
+      - name: Upload CLI artifact to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ matrix.platform }}" = "windows-latest" ]; then
+            gh release upload "${{ github.ref_name }}" "dist/${{ matrix.artifact_name }}.zip" --clobber --repo "${{ github.repository }}"
+          else
+            gh release upload "${{ github.ref_name }}" "dist/${{ matrix.artifact_name }}.tar.gz" --clobber --repo "${{ github.repository }}"
+          fi
+        shell: bash
+
+  # Build GUI app with Tauri
+  gui:
     permissions:
       contents: write
     strategy:
@@ -16,12 +85,16 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
+            arch: 'aarch64'
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
+            arch: 'x64'
           - platform: 'ubuntu-22.04'
             args: ''
+            arch: ''
           - platform: 'windows-latest'
             args: ''
+            arch: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -67,6 +140,7 @@ jobs:
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Build the app
+        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -83,3 +157,16 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Rename macOS DMG for Homebrew
+        if: matrix.platform == 'macos-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find the DMG file in the artifacts
+          DMG_PATH=$(find src-tauri/target -name "*.dmg" -type f 2>/dev/null | head -1)
+          if [ -n "$DMG_PATH" ]; then
+            NEW_NAME="EasyKpf_${{ matrix.arch }}.dmg"
+            # Upload with new name to the release
+            gh release upload "${{ github.ref_name }}" "$DMG_PATH" --clobber --repo "${{ github.repository }}" -n "$NEW_NAME"
+          fi
