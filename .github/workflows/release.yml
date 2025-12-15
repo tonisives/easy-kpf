@@ -41,6 +41,14 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Update version if release starts with 'v'
         shell: bash
         run: ./etc/update-version.sh "${{ github.ref_name }}"
