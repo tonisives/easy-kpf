@@ -1,6 +1,6 @@
+use async_trait::async_trait;
 use easy_kpf_core::error::{AppError, Result};
 use easy_kpf_core::services::ConfigService;
-use async_trait::async_trait;
 use std::path::Path;
 use tauri_plugin_shell::ShellExt;
 
@@ -118,18 +118,17 @@ impl KubectlService {
     let error_lower = error.to_lowercase();
 
     if error_lower.contains("unable to connect") || error_lower.contains("connection refused") {
-      "Unable to connect to cluster. Check your internet connection and cluster status."
-        .to_string()
+      "Unable to connect to cluster. Check your internet connection and cluster status.".to_string()
     } else if error_lower.contains("unauthorized") || error_lower.contains("forbidden") {
       "Authentication failed. For GKE clusters, run: gcloud auth application-default login"
         .to_string()
     } else if error_lower.contains("token") && error_lower.contains("expired") {
-      "Authentication token expired. For GKE clusters, run: gcloud auth application-default login".to_string()
+      "Authentication token expired. For GKE clusters, run: gcloud auth application-default login"
+        .to_string()
     } else if error_lower.contains("no cluster") || error_lower.contains("context") {
       "No active kubectl context found. Configure kubectl with: kubectl config use-context <context-name>".to_string()
     } else if error_lower.contains("gke_gcloud_auth_plugin") {
-      "GKE auth plugin required. Run: gcloud components install gke-gcloud-auth-plugin"
-        .to_string()
+      "GKE auth plugin required. Run: gcloud components install gke-gcloud-auth-plugin".to_string()
     } else {
       format!("kubectl error: {}", error)
     }

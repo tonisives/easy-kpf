@@ -44,7 +44,11 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
     draw_search_bar(frame, app, chunks[0]);
   } else {
     let title = Paragraph::new(" Easy KPF")
-      .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+      .style(
+        Style::default()
+          .fg(Color::Cyan)
+          .add_modifier(Modifier::BOLD),
+      )
       .block(
         Block::default()
           .borders(Borders::ALL)

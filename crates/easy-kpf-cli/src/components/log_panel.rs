@@ -9,7 +9,11 @@ use ratatui::{
 
 pub fn draw_log_panel(frame: &mut Frame, app: &App, area: Rect) {
   let is_focused = app.active_panel == Panel::Logs;
-  let border_color = if is_focused { Color::Cyan } else { Color::DarkGray };
+  let border_color = if is_focused {
+    Color::Cyan
+  } else {
+    Color::DarkGray
+  };
 
   let title = app
     .selected_name()

@@ -52,8 +52,7 @@ pub fn draw_service_list(frame: &mut Frame, app: &App, area: Rect) {
           .add_modifier(Modifier::BOLD)
       } else if is_in_visual {
         // Visual selection (not cursor)
-        Style::default()
-          .bg(Color::Rgb(60, 30, 60)) // Subtle magenta for selection
+        Style::default().bg(Color::Rgb(60, 30, 60)) // Subtle magenta for selection
       } else if is_cursor {
         // Normal cursor (not in visual mode)
         Style::default()

@@ -130,7 +130,12 @@ fn get_field_styles(is_selected: bool, is_editing: bool) -> (Style, Style) {
   (style, border_style)
 }
 
-fn get_field_display_value(app: &App, field_index: usize, is_selected: bool, is_typing: bool) -> String {
+fn get_field_display_value(
+  app: &App,
+  field_index: usize,
+  is_selected: bool,
+  is_typing: bool,
+) -> String {
   if is_selected {
     if is_typing {
       // Show cursor at the correct position
@@ -149,7 +154,10 @@ fn build_instructions(app: &App) -> Paragraph<'static> {
   let content = if app.command_mode {
     Line::from(vec![
       Span::styled(":", Style::default().fg(Color::Yellow)),
-      Span::styled(app.command_buffer.clone(), Style::default().fg(Color::White)),
+      Span::styled(
+        app.command_buffer.clone(),
+        Style::default().fg(Color::White),
+      ),
       Span::styled("_", Style::default().fg(Color::Yellow)),
     ])
   } else if app.is_vim_edit_mode() {
@@ -226,9 +234,13 @@ fn draw_suggestions_list(frame: &mut Frame, app: &App, suggestions: &[String], a
       let prefix = if is_selected { "> " } else { "  " };
       let style = if is_selected {
         if suggestions_focused {
-          Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+          Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
         } else {
-          Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+          Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD)
         }
       } else {
         Style::default().fg(Color::White)
@@ -237,8 +249,16 @@ fn draw_suggestions_list(frame: &mut Frame, app: &App, suggestions: &[String], a
     })
     .collect();
 
-  let title = format!(" Suggestions ({}/{}) j/k nav, Enter accept ", selected + 1, total);
-  let border_color = if suggestions_focused { Color::Yellow } else { Color::Cyan };
+  let title = format!(
+    " Suggestions ({}/{}) j/k nav, Enter accept ",
+    selected + 1,
+    total
+  );
+  let border_color = if suggestions_focused {
+    Color::Yellow
+  } else {
+    Color::Cyan
+  };
 
   let list = List::new(items).block(
     Block::default()

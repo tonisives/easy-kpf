@@ -26,10 +26,10 @@ impl EventHandler {
           match event::read() {
             Ok(CrosstermEvent::Key(key)) => {
               // Only handle key press events (not release)
-              if key.kind == KeyEventKind::Press
-                && event_tx.blocking_send(Event::Key(key)).is_err() {
-                  break;
-                }
+              if key.kind == KeyEventKind::Press && event_tx.blocking_send(Event::Key(key)).is_err()
+              {
+                break;
+              }
             }
             Ok(CrosstermEvent::Resize(w, h)) => {
               if event_tx.blocking_send(Event::Resize(w, h)).is_err() {

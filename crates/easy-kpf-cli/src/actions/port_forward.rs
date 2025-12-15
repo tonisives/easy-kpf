@@ -33,11 +33,7 @@ fn find_privileged_ports(config: &PortForwardConfig) -> Vec<u16> {
 }
 
 /// Check for privileged ports and warn if not running as root
-async fn check_privileged_ports(
-  app: &mut App,
-  config: &PortForwardConfig,
-  name: &str,
-) -> bool {
+async fn check_privileged_ports(app: &mut App, config: &PortForwardConfig, name: &str) -> bool {
   let privileged_ports = find_privileged_ports(config);
   if privileged_ports.is_empty() || is_running_as_root() {
     return true; // OK to proceed
@@ -69,7 +65,10 @@ async fn check_privileged_ports(
 }
 
 /// Build the command for the port forward based on forward type
-fn build_command(app: &App, config: &PortForwardConfig) -> (String, Vec<String>, Vec<(String, String)>) {
+fn build_command(
+  app: &App,
+  config: &PortForwardConfig,
+) -> (String, Vec<String>, Vec<(String, String)>) {
   match config.forward_type {
     ForwardType::Ssh => {
       let builder = SshCommandBuilder::new();

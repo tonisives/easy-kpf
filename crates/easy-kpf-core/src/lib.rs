@@ -10,6 +10,6 @@ pub use services::{
 };
 pub use traits::{CommandExecutor, ProcessEvent, ProcessHandle, ProcessOutput};
 pub use types::{
-  AppConfig, ForwardType, PortForwardConfig, PortForwardConfigs, ProcessInfo,
-  ProcessManagerState, SerializableProcessInfo,
+  AppConfig, ForwardType, PortForwardConfig, PortForwardConfigs, ProcessInfo, ProcessManagerState,
+  SerializableProcessInfo,
 };

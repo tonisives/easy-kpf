@@ -86,7 +86,6 @@ pub enum ConfirmAction {
   CancelEdit(Mode), // Stores the mode to return to if user says "No"
 }
 
-
 impl App {
   pub fn new() -> Result<Self> {
     let config_service = ConfigService::new()?;
@@ -164,7 +163,8 @@ impl App {
       (0..self.configs.len()).collect()
     } else {
       let query = self.search_query.to_lowercase();
-      self.configs
+      self
+        .configs
         .iter()
         .enumerate()
         .filter(|(_, c)| {
@@ -381,7 +381,11 @@ impl App {
   pub fn derive_config_name(config: &PortForwardConfig) -> String {
     match config.forward_type {
       ForwardType::Ssh => {
-        let host = config.service.split('@').next_back().unwrap_or(&config.service);
+        let host = config
+          .service
+          .split('@')
+          .next_back()
+          .unwrap_or(&config.service);
         let port = config
           .ports
           .first()
@@ -748,8 +752,7 @@ impl App {
   pub fn autocomplete_next(&mut self) {
     let suggestions = self.get_autocomplete_suggestions();
     if !suggestions.is_empty() {
-      self.autocomplete.selected_index =
-        (self.autocomplete.selected_index + 1) % suggestions.len();
+      self.autocomplete.selected_index = (self.autocomplete.selected_index + 1) % suggestions.len();
     }
   }
 

@@ -166,16 +166,18 @@ impl VimState {
   }
 }
 
-fn handle_movement(input: &Input, textarea: &mut TextArea<'_>, mode: VimMode) -> Option<VimTransition> {
+fn handle_movement(
+  input: &Input,
+  textarea: &mut TextArea<'_>,
+  mode: VimMode,
+) -> Option<VimTransition> {
   match input {
     // Basic movement
     Input {
       key: Key::Char('h'),
       ..
     }
-    | Input {
-      key: Key::Left, ..
-    } => {
+    | Input { key: Key::Left, .. } => {
       textarea.move_cursor(CursorMove::Back);
       Some(complete_operator(mode, textarea))
     }
@@ -235,7 +237,11 @@ fn handle_movement(input: &Input, textarea: &mut TextArea<'_>, mode: VimMode) ->
   }
 }
 
-fn handle_delete_change(input: &Input, textarea: &mut TextArea<'_>, mode: VimMode) -> Option<VimTransition> {
+fn handle_delete_change(
+  input: &Input,
+  textarea: &mut TextArea<'_>,
+  mode: VimMode,
+) -> Option<VimTransition> {
   match input {
     Input {
       key: Key::Char('D'),
@@ -357,7 +363,11 @@ fn handle_enter_insert(input: &Input, textarea: &mut TextArea<'_>) -> Option<Vim
   }
 }
 
-fn handle_visual_mode(input: &Input, textarea: &mut TextArea<'_>, mode: VimMode) -> Option<VimTransition> {
+fn handle_visual_mode(
+  input: &Input,
+  textarea: &mut TextArea<'_>,
+  mode: VimMode,
+) -> Option<VimTransition> {
   match input {
     // Enter visual mode from normal
     Input {

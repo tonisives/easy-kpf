@@ -74,7 +74,9 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     line_spans.push(Span::raw("  "));
     line_spans.push(Span::styled(
       msg,
-      Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC),
+      Style::default()
+        .fg(Color::Yellow)
+        .add_modifier(Modifier::ITALIC),
     ));
   }
 

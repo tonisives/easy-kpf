@@ -53,13 +53,11 @@ impl KubectlService {
       .output();
 
     match output {
-      Ok(output) if output.status.success() => {
-        String::from_utf8_lossy(&output.stdout)
-          .lines()
-          .map(|s| s.trim().to_string())
-          .filter(|s| !s.is_empty())
-          .collect()
-      }
+      Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect(),
       _ => vec![],
     }
   }
@@ -78,12 +76,10 @@ impl KubectlService {
       .output();
 
     match output {
-      Ok(output) if output.status.success() => {
-        String::from_utf8_lossy(&output.stdout)
-          .split_whitespace()
-          .map(std::string::ToString::to_string)
-          .collect()
-      }
+      Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout)
+        .split_whitespace()
+        .map(std::string::ToString::to_string)
+        .collect(),
       _ => vec![],
     }
   }
@@ -104,12 +100,10 @@ impl KubectlService {
       .output();
 
     match output {
-      Ok(output) if output.status.success() => {
-        String::from_utf8_lossy(&output.stdout)
-          .split_whitespace()
-          .map(|s| format!("svc/{}", s))
-          .collect()
-      }
+      Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout)
+        .split_whitespace()
+        .map(|s| format!("svc/{}", s))
+        .collect(),
       _ => vec![],
     }
   }
@@ -133,12 +127,10 @@ impl KubectlService {
       .output();
 
     match output {
-      Ok(output) if output.status.success() => {
-        String::from_utf8_lossy(&output.stdout)
-          .split_whitespace()
-          .map(|port| format!("{}:{}", port, port))
-          .collect()
-      }
+      Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout)
+        .split_whitespace()
+        .map(|port| format!("{}:{}", port, port))
+        .collect(),
       _ => vec![],
     }
   }
