@@ -6,7 +6,7 @@ use crate::components::{
 use ratatui::{
   layout::{Constraint, Direction, Layout, Rect},
   style::{Color, Modifier, Style},
-  widgets::{Block, Borders, Clear, Paragraph},
+  widgets::{Block, BorderType, Borders, Clear, Paragraph},
   Frame,
 };
 
@@ -45,14 +45,22 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
   } else {
     let title = Paragraph::new(" Easy KPF")
       .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-      .block(Block::default().borders(Borders::ALL));
+      .block(
+        Block::default()
+          .borders(Borders::ALL)
+          .border_type(BorderType::Rounded),
+      );
     frame.render_widget(title, chunks[0]);
   }
 
   // Help hint
   let help_hint = Paragraph::new(" [?] Help ")
     .style(Style::default().fg(Color::DarkGray))
-    .block(Block::default().borders(Borders::ALL));
+    .block(
+      Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded),
+    );
   frame.render_widget(help_hint, chunks[1]);
 }
 
@@ -67,12 +75,31 @@ fn draw_main_content(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_confirm_dialog(frame: &mut Frame, app: &App) {
-  let area = centered_rect(50, 20, frame.area());
+  let area = centered_rect(50, 25, frame.area());
   frame.render_widget(Clear, area);
 
   let message = match &app.confirm_action {
     Some(crate::app::ConfirmAction::Delete(key)) => {
       format!("Delete '{}'?\n\n[y] Yes  [n] No", key)
+    }
+    Some(crate::app::ConfirmAction::StartAll) => {
+      let count = app.configs.len();
+      format!(
+        "Start all {} port forward{}?\n\n[y] Yes  [n] No",
+        count,
+        if count == 1 { "" } else { "s" }
+      )
+    }
+    Some(crate::app::ConfirmAction::StopAll) => {
+      let count = app.running_services.len();
+      format!(
+        "Stop all {} port forward{}?\n\n[y] Yes  [n] No",
+        count,
+        if count == 1 { "" } else { "s" }
+      )
+    }
+    Some(crate::app::ConfirmAction::CancelEdit(_)) => {
+      "Discard changes?\n\n[y] Yes  [n] No".to_string()
     }
     None => "Confirm?".to_string(),
   };
@@ -83,6 +110,7 @@ fn draw_confirm_dialog(frame: &mut Frame, app: &App) {
       Block::default()
         .title(" Confirm ")
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Yellow)),
     );
 

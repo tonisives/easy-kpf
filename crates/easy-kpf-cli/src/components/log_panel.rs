@@ -3,7 +3,7 @@ use ratatui::{
   layout::Rect,
   style::{Color, Style},
   text::{Line, Span},
-  widgets::{Block, Borders, Paragraph, Wrap},
+  widgets::{Block, BorderType, Borders, Paragraph, Wrap},
   Frame,
 };
 
@@ -44,6 +44,7 @@ pub fn draw_log_panel(frame: &mut Frame, app: &App, area: Rect) {
       Block::default()
         .title(title)
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(border_color)),
     )
     .wrap(Wrap { trim: false });

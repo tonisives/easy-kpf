@@ -902,10 +902,12 @@ dependencies = [
  "crossterm",
  "easy-kpf-core",
  "env_logger",
+ "libc",
  "log",
  "ratatui 0.29.0",
  "tokio",
  "tui-input",
+ "tui-textarea",
  "unicode-width 0.2.0",
 ]
 
@@ -4549,6 +4551,17 @@ checksum = "bd137780d743c103a391e06fe952487f914b299a4fe2c3626677f6a6339a7c6b"
 dependencies = [
  "ratatui 0.28.1",
  "unicode-width 0.1.14",
+]
+
+[[package]]
+name = "tui-textarea"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a5318dd619ed73c52a9417ad19046724effc1287fb75cdcc4eca1d6ac1acbae"
+dependencies = [
+ "crossterm",
+ "ratatui 0.29.0",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]

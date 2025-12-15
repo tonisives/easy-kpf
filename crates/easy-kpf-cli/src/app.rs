@@ -1,14 +1,27 @@
+use crate::kubectl::KubectlService;
+use crate::vim::VimState;
 use easy_kpf_core::{
   services::{ConfigService, ProcessManager},
   ForwardType, PortForwardConfig, Result,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::mpsc as std_mpsc;
 use tokio::sync::mpsc;
+use tui_textarea::TextArea;
+
+#[derive(Debug)]
+pub enum AutocompleteResult {
+  Contexts(Vec<String>),
+  Namespaces(Vec<String>),
+  Services(Vec<String>),
+  Ports(Vec<String>),
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
   Normal,
+  Visual,
   Search,
   Help,
   Edit,
@@ -34,6 +47,7 @@ pub struct App {
   pub configs: Vec<PortForwardConfig>,
   pub running_services: HashMap<String, u32>, // name -> pid
   pub selected_index: usize,                  // Index into visual_order
+  pub visual_anchor: Option<usize>,           // Start of visual selection (when in Visual mode)
   pub search_query: String,
   pub visual_order: Vec<usize>, // Config indices in display order (grouped by context)
   pub logs: HashMap<String, Vec<LogEntry>>,
@@ -49,13 +63,58 @@ pub struct App {
   pub edit_config: Option<PortForwardConfig>,
   pub edit_field_index: usize,
   pub edit_field_value: String,
+  pub edit_cursor_pos: usize, // Cursor position within edit_field_value
+  pub name_manually_edited: bool,
   // Confirm mode state
   pub confirm_action: Option<ConfirmAction>,
+  // Autocomplete state
+  pub autocomplete: AutocompleteState,
+  pub kubectl_service: KubectlService,
+  pub autocomplete_rx: std_mpsc::Receiver<AutocompleteResult>,
+  pub autocomplete_tx: std_mpsc::Sender<AutocompleteResult>,
+  // Vim command mode state (for :w, :q commands in edit form)
+  pub command_mode: bool,
+  pub command_buffer: String,
+  // Vim edit mode state (press 'e' to enter vim-like editing for current field)
+  pub vim_textarea: Option<TextArea<'static>>,
+  pub vim_state: Option<VimState>,
 }
 
 #[derive(Debug, Clone)]
 pub enum ConfirmAction {
   Delete(String),
+  StartAll,
+  StopAll,
+  CancelEdit(Mode), // Stores the mode to return to if user says "No"
+}
+
+#[derive(Debug, Clone)]
+pub struct AutocompleteState {
+  pub contexts: Vec<String>,
+  pub namespaces: Vec<String>,
+  pub services: Vec<String>,
+  pub ports: Vec<String>,
+  pub types: Vec<String>,
+  pub selected_index: usize,
+  pub loading: bool,
+  pub focused: bool,  // Whether suggestions panel is focused
+  pub typing: bool,   // Whether in typing mode (i to enter, Esc to exit)
+}
+
+impl Default for AutocompleteState {
+  fn default() -> Self {
+    Self {
+      contexts: vec![],
+      namespaces: vec![],
+      services: vec![],
+      ports: vec![],
+      types: vec!["kubectl".to_string(), "ssh".to_string()],
+      selected_index: 0,
+      loading: false,
+      focused: false,
+      typing: false,
+    }
+  }
 }
 
 impl App {
@@ -64,6 +123,8 @@ impl App {
     let state_file = config_service.config_dir().join("process-state.json");
     let process_manager = ProcessManager::with_state_file(state_file);
     let (log_sender, log_receiver) = mpsc::channel(1000);
+    let kubectl_service = KubectlService::new(config_service.clone());
+    let (autocomplete_tx, autocomplete_rx) = std_mpsc::channel();
 
     let mut app = Self {
       mode: Mode::Normal,
@@ -71,6 +132,7 @@ impl App {
       configs: Vec::new(),
       running_services: HashMap::new(),
       selected_index: 0,
+      visual_anchor: None,
       search_query: String::new(),
       visual_order: Vec::new(),
       logs: HashMap::new(),
@@ -84,7 +146,17 @@ impl App {
       edit_config: None,
       edit_field_index: 0,
       edit_field_value: String::new(),
+      edit_cursor_pos: 0,
+      name_manually_edited: false,
       confirm_action: None,
+      autocomplete: AutocompleteState::default(),
+      kubectl_service,
+      autocomplete_rx,
+      autocomplete_tx,
+      command_mode: false,
+      command_buffer: String::new(),
+      vim_textarea: None,
+      vim_state: None,
     };
 
     app.load_configs()?;
@@ -197,6 +269,62 @@ impl App {
     self.selected_index = new_index as usize;
   }
 
+  pub fn select_first(&mut self) {
+    self.selected_index = 0;
+  }
+
+  pub fn select_last(&mut self) {
+    if !self.visual_order.is_empty() {
+      self.selected_index = self.visual_order.len() - 1;
+    }
+  }
+
+  pub fn enter_visual_mode(&mut self) {
+    self.visual_anchor = Some(self.selected_index);
+    self.mode = Mode::Visual;
+  }
+
+  pub fn exit_visual_mode(&mut self) {
+    self.visual_anchor = None;
+    self.mode = Mode::Normal;
+  }
+
+  /// Returns the range of visual indices that are selected (inclusive)
+  /// Returns (start, end) where start <= end
+  pub fn visual_selection_range(&self) -> Option<(usize, usize)> {
+    self.visual_anchor.map(|anchor| {
+      let start = anchor.min(self.selected_index);
+      let end = anchor.max(self.selected_index);
+      (start, end)
+    })
+  }
+
+  /// Check if a visual index is within the visual selection
+  pub fn is_in_visual_selection(&self, visual_idx: usize) -> bool {
+    if self.mode != Mode::Visual {
+      return false;
+    }
+    self
+      .visual_selection_range()
+      .map(|(start, end)| visual_idx >= start && visual_idx <= end)
+      .unwrap_or(false)
+  }
+
+  /// Get configs in the visual selection range
+  pub fn get_visual_selection_configs(&self) -> Vec<PortForwardConfig> {
+    let Some((start, end)) = self.visual_selection_range() else {
+      return vec![];
+    };
+    (start..=end)
+      .filter_map(|visual_idx| {
+        self
+          .visual_order
+          .get(visual_idx)
+          .and_then(|&config_idx| self.configs.get(config_idx).cloned())
+      })
+      .collect()
+  }
+
   pub fn set_status(&mut self, msg: impl Into<String>) {
     self.status_message = Some(msg.into());
   }
@@ -242,15 +370,25 @@ impl App {
       self.edit_config = Some(config);
       self.edit_field_index = 0;
       self.edit_field_value = self.get_edit_field_value(0);
+      self.edit_cursor_pos = self.edit_field_value.len();
+      self.name_manually_edited = true; // Existing config has user-defined name
+      self.autocomplete = AutocompleteState::default();
       self.mode = Mode::Edit;
+      // Field 0 (Name) doesn't support autocomplete, so no auto-load
     }
   }
 
   pub fn enter_create_mode(&mut self) {
+    // If there's a selected config, use its context as default
+    let (default_context, default_namespace) = self
+      .selected_config()
+      .map(|c| (c.context.clone(), c.namespace.clone()))
+      .unwrap_or_else(|| (String::new(), "default".to_string()));
+
     self.edit_config = Some(PortForwardConfig {
       name: String::new(),
-      context: String::new(),
-      namespace: "default".to_string(),
+      context: default_context,
+      namespace: default_namespace,
       service: String::new(),
       ports: vec![],
       local_interface: None,
@@ -258,7 +396,56 @@ impl App {
     });
     self.edit_field_index = 0;
     self.edit_field_value = String::new();
+    self.edit_cursor_pos = 0;
+    self.name_manually_edited = false; // New config starts with auto-generated name
+    self.autocomplete = AutocompleteState::default();
     self.mode = Mode::Create;
+    // Field 0 (Name) doesn't support autocomplete, so no auto-load
+  }
+
+  // Derive a config name from service and port (like the GUI does)
+  pub fn derive_config_name(config: &PortForwardConfig) -> String {
+    match config.forward_type {
+      ForwardType::Ssh => {
+        let host = config.service.split('@').last().unwrap_or(&config.service);
+        let port = config
+          .ports
+          .first()
+          .and_then(|p| p.split(':').next())
+          .unwrap_or("unknown");
+        format!("{}-{}", host, port)
+      }
+      ForwardType::Kubectl => {
+        let port = config
+          .ports
+          .first()
+          .and_then(|p| p.split(':').next())
+          .unwrap_or("unknown");
+        if config.service.is_empty() {
+          "new-forward".to_string()
+        } else {
+          format!("{}-{}", config.service, port)
+        }
+      }
+    }
+  }
+
+  // Update the auto-generated name if not manually edited
+  pub fn update_auto_generated_name(&mut self) {
+    if self.name_manually_edited || self.mode != Mode::Create {
+      return;
+    }
+
+    if let Some(config) = &self.edit_config {
+      let derived = Self::derive_config_name(config);
+      if let Some(cfg) = &mut self.edit_config {
+        cfg.name = derived.clone();
+      }
+      // Update the field value if we're currently on the name field
+      if self.edit_field_index == 0 {
+        self.edit_field_value = derived;
+      }
+    }
   }
 
   pub fn get_edit_field_value(&self, field_index: usize) -> String {
@@ -282,8 +469,11 @@ impl App {
   }
 
   pub fn set_edit_field_value(&mut self, value: String) {
+    let field_index = self.edit_field_index;
+    let should_update_name = matches!(field_index, 3 | 4 | 6); // service, ports, or type
+
     if let Some(config) = &mut self.edit_config {
-      match self.edit_field_index {
+      match field_index {
         0 => config.name = value,
         1 => config.context = value,
         2 => config.namespace = value,
@@ -306,6 +496,11 @@ impl App {
         _ => {}
       }
     }
+
+    // Update auto-generated name when service, ports, or type change
+    if should_update_name {
+      self.update_auto_generated_name();
+    }
   }
 
   pub fn edit_field_count(&self) -> usize {
@@ -325,10 +520,30 @@ impl App {
     }
   }
 
+  pub fn edit_field_description(&self, index: usize) -> &'static str {
+    match index {
+      5 => "Optional, e.g. 127.0.0.2 to avoid port conflicts",
+      _ => "",
+    }
+  }
+
   pub fn next_edit_field(&mut self) {
     self.set_edit_field_value(self.edit_field_value.clone());
     self.edit_field_index = (self.edit_field_index + 1) % self.edit_field_count();
     self.edit_field_value = self.get_edit_field_value(self.edit_field_index);
+    self.edit_cursor_pos = self.edit_field_value.len();
+    self.autocomplete.focused = false;
+    self.autocomplete.typing = false;
+    // Auto-load suggestions for supported fields
+    if self.field_supports_autocomplete(self.edit_field_index) {
+      self.load_autocomplete();
+      // For static fields (type), sync selection immediately
+      if self.edit_field_index == 6 {
+        self.sync_autocomplete_selection();
+      }
+    } else {
+      self.clear_autocomplete();
+    }
   }
 
   pub fn prev_edit_field(&mut self) {
@@ -339,6 +554,117 @@ impl App {
       self.edit_field_index - 1
     };
     self.edit_field_value = self.get_edit_field_value(self.edit_field_index);
+    self.edit_cursor_pos = self.edit_field_value.len();
+    self.autocomplete.focused = false;
+    self.autocomplete.typing = false;
+    // Auto-load suggestions for supported fields
+    if self.field_supports_autocomplete(self.edit_field_index) {
+      self.load_autocomplete();
+      // For static fields (type), sync selection immediately
+      if self.edit_field_index == 6 {
+        self.sync_autocomplete_selection();
+      }
+    } else {
+      self.clear_autocomplete();
+    }
+  }
+
+  fn field_supports_autocomplete(&self, field_index: usize) -> bool {
+    matches!(field_index, 1 | 2 | 3 | 4 | 6)
+  }
+
+  #[allow(dead_code)]
+  pub fn focus_suggestions(&mut self) {
+    if !self.get_autocomplete_suggestions().is_empty() {
+      self.autocomplete.focused = true;
+    }
+  }
+
+  pub fn unfocus_suggestions(&mut self) {
+    self.autocomplete.focused = false;
+  }
+
+  pub fn enter_typing_mode(&mut self) {
+    self.autocomplete.typing = true;
+    self.edit_cursor_pos = self.edit_field_value.len();
+  }
+
+  pub fn exit_typing_mode(&mut self) {
+    self.autocomplete.typing = false;
+  }
+
+  pub fn enter_command_mode(&mut self) {
+    self.command_mode = true;
+    self.command_buffer.clear();
+  }
+
+  pub fn exit_command_mode(&mut self) {
+    self.command_mode = false;
+    self.command_buffer.clear();
+  }
+
+  pub fn enter_vim_edit_mode(&mut self) {
+    use crate::vim::VimMode;
+
+    let mut textarea = TextArea::from([self.edit_field_value.as_str()]);
+    textarea.set_cursor_style(VimMode::Normal.cursor_style());
+    // Move cursor to end
+    textarea.move_cursor(tui_textarea::CursorMove::End);
+
+    self.vim_textarea = Some(textarea);
+    self.vim_state = Some(VimState::new());
+  }
+
+  pub fn exit_vim_edit_mode(&mut self) {
+    // Copy the text back from textarea
+    if let Some(textarea) = &self.vim_textarea {
+      let lines = textarea.lines();
+      self.edit_field_value = lines.first().cloned().unwrap_or_default();
+      self.edit_cursor_pos = self.edit_field_value.len();
+    }
+    self.vim_textarea = None;
+    self.vim_state = None;
+  }
+
+  pub fn is_vim_edit_mode(&self) -> bool {
+    self.vim_textarea.is_some()
+  }
+
+  // Cursor movement helpers for edit field
+  pub fn cursor_left(&mut self) {
+    if self.edit_cursor_pos > 0 {
+      // Move back by one character (handle UTF-8 properly)
+      let s = &self.edit_field_value[..self.edit_cursor_pos];
+      if let Some(c) = s.chars().last() {
+        self.edit_cursor_pos -= c.len_utf8();
+      }
+    }
+  }
+
+  pub fn cursor_right(&mut self) {
+    if self.edit_cursor_pos < self.edit_field_value.len() {
+      // Move forward by one character (handle UTF-8 properly)
+      let s = &self.edit_field_value[self.edit_cursor_pos..];
+      if let Some(c) = s.chars().next() {
+        self.edit_cursor_pos += c.len_utf8();
+      }
+    }
+  }
+
+  pub fn insert_char(&mut self, c: char) {
+    self.edit_field_value.insert(self.edit_cursor_pos, c);
+    self.edit_cursor_pos += c.len_utf8();
+  }
+
+  pub fn delete_char_before_cursor(&mut self) {
+    if self.edit_cursor_pos > 0 {
+      let s = &self.edit_field_value[..self.edit_cursor_pos];
+      if let Some(c) = s.chars().last() {
+        let char_len = c.len_utf8();
+        self.edit_cursor_pos -= char_len;
+        self.edit_field_value.remove(self.edit_cursor_pos);
+      }
+    }
   }
 
   pub fn save_edit(&mut self) -> Result<()> {
@@ -360,11 +686,151 @@ impl App {
 
   pub fn cancel_edit(&mut self) {
     self.edit_config = None;
+    self.autocomplete = AutocompleteState::default();
     self.mode = Mode::Normal;
   }
 
   pub fn get_config_file_path(&self) -> PathBuf {
     self.config_service.config_dir().join("port-forwards.yaml")
+  }
+
+  // Load autocomplete suggestions for the current field (async via background thread)
+  pub fn load_autocomplete(&mut self) {
+    self.autocomplete.selected_index = 0;
+
+    // First, save the current field value to edit_config
+    self.set_edit_field_value(self.edit_field_value.clone());
+
+    let config = match &self.edit_config {
+      Some(c) => c.clone(),
+      None => return,
+    };
+
+    let field_index = self.edit_field_index;
+    let tx = self.autocomplete_tx.clone();
+    let kubectl = self.kubectl_service.clone();
+
+    // Clear current suggestions and set loading
+    match field_index {
+      1 => self.autocomplete.contexts.clear(),
+      2 => self.autocomplete.namespaces.clear(),
+      3 => self.autocomplete.services.clear(),
+      4 => self.autocomplete.ports.clear(),
+      _ => return, // No async loading needed for other fields
+    }
+    self.autocomplete.loading = true;
+
+    // Spawn background thread for kubectl calls
+    std::thread::spawn(move || {
+      let result = match field_index {
+        1 => AutocompleteResult::Contexts(kubectl.get_contexts()),
+        2 => {
+          if !config.context.is_empty() {
+            AutocompleteResult::Namespaces(kubectl.get_namespaces(&config.context))
+          } else {
+            AutocompleteResult::Namespaces(vec![])
+          }
+        }
+        3 => {
+          if !config.context.is_empty() && !config.namespace.is_empty() {
+            AutocompleteResult::Services(kubectl.get_services(&config.context, &config.namespace))
+          } else {
+            AutocompleteResult::Services(vec![])
+          }
+        }
+        4 => {
+          if !config.context.is_empty()
+            && !config.namespace.is_empty()
+            && !config.service.is_empty()
+          {
+            AutocompleteResult::Ports(kubectl.get_service_ports(
+              &config.context,
+              &config.namespace,
+              &config.service,
+            ))
+          } else {
+            AutocompleteResult::Ports(vec![])
+          }
+        }
+        _ => return,
+      };
+      let _ = tx.send(result);
+    });
+  }
+
+  // Poll for autocomplete results (call this in the main loop)
+  pub fn poll_autocomplete(&mut self) {
+    while let Ok(result) = self.autocomplete_rx.try_recv() {
+      self.autocomplete.loading = false;
+      match result {
+        AutocompleteResult::Contexts(v) => self.autocomplete.contexts = v,
+        AutocompleteResult::Namespaces(v) => self.autocomplete.namespaces = v,
+        AutocompleteResult::Services(v) => self.autocomplete.services = v,
+        AutocompleteResult::Ports(v) => self.autocomplete.ports = v,
+      }
+      // After loading, try to select the current field value in suggestions
+      self.sync_autocomplete_selection();
+    }
+  }
+
+  // Get autocomplete suggestions for the current field
+  pub fn get_autocomplete_suggestions(&self) -> &[String] {
+    match self.edit_field_index {
+      1 => &self.autocomplete.contexts,
+      2 => &self.autocomplete.namespaces,
+      3 => &self.autocomplete.services,
+      4 => &self.autocomplete.ports,
+      6 => &self.autocomplete.types,
+      _ => &[],
+    }
+  }
+
+  // Navigate autocomplete selection
+  pub fn autocomplete_next(&mut self) {
+    let suggestions = self.get_autocomplete_suggestions();
+    if !suggestions.is_empty() {
+      self.autocomplete.selected_index =
+        (self.autocomplete.selected_index + 1) % suggestions.len();
+    }
+  }
+
+  pub fn autocomplete_prev(&mut self) {
+    let suggestions = self.get_autocomplete_suggestions();
+    if !suggestions.is_empty() {
+      self.autocomplete.selected_index = if self.autocomplete.selected_index == 0 {
+        suggestions.len() - 1
+      } else {
+        self.autocomplete.selected_index - 1
+      };
+    }
+  }
+
+  // Accept the current autocomplete selection
+  pub fn accept_autocomplete(&mut self) {
+    let suggestions = self.get_autocomplete_suggestions();
+    if let Some(value) = suggestions.get(self.autocomplete.selected_index) {
+      self.edit_field_value = value.clone();
+      self.edit_cursor_pos = self.edit_field_value.len();
+    }
+  }
+
+  // Clear autocomplete state
+  pub fn clear_autocomplete(&mut self) {
+    self.autocomplete = AutocompleteState::default();
+  }
+
+  // Sync autocomplete selection to match current field value
+  pub fn sync_autocomplete_selection(&mut self) {
+    let current_value = &self.edit_field_value;
+    let suggestions = self.get_autocomplete_suggestions();
+
+    // Find the index of current value in suggestions
+    if let Some(idx) = suggestions.iter().position(|s| s == current_value) {
+      self.autocomplete.selected_index = idx;
+    } else {
+      // Value not in suggestions, keep at 0
+      self.autocomplete.selected_index = 0;
+    }
   }
 }
 

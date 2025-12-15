@@ -14,13 +14,12 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         vec![
           ("j/k", "navigate"),
           ("Space", "toggle"),
-          ("a", "toggle all"),
+          ("v", "visual"),
+          ("a", "all"),
           ("n", "new"),
           ("e", "edit"),
-          ("d", "delete"),
+          ("d", "del"),
           ("/", "search"),
-          ("E", "$EDITOR"),
-          ("l", "logs"),
           ("?", "help"),
           ("q", "quit"),
         ]
@@ -42,6 +41,13 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     ],
     Mode::Help => vec![("Esc/q/?", "close")],
     Mode::Confirm => vec![("y", "yes"), ("n", "no"), ("Esc", "cancel")],
+    Mode::Visual => vec![
+      ("j/k", "extend"),
+      ("Space", "toggle"),
+      ("s", "start"),
+      ("x", "stop"),
+      ("Esc", "exit"),
+    ],
   };
 
   let spans: Vec<Span> = bindings

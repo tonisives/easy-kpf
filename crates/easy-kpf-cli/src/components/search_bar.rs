@@ -2,7 +2,7 @@ use crate::app::App;
 use ratatui::{
   layout::Rect,
   style::{Color, Style},
-  widgets::{Block, Borders, Paragraph},
+  widgets::{Block, BorderType, Borders, Paragraph},
   Frame,
 };
 
@@ -15,6 +15,7 @@ pub fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect) {
       Block::default()
         .title(" Search ")
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Yellow)),
     );
 

@@ -2,7 +2,9 @@ mod actions;
 mod app;
 mod components;
 mod executor;
+mod kubectl;
 mod tui;
+mod vim;
 
 use app::App;
 use std::time::Duration;
@@ -102,6 +104,9 @@ async fn run_app(
     if app.should_quit {
       break;
     }
+
+    // Poll for autocomplete results
+    app.poll_autocomplete();
 
     // Check for terminated processes and update state
     let terminated: Vec<String> = app
