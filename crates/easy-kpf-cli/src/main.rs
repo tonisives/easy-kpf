@@ -3,6 +3,7 @@ mod app;
 mod components;
 mod executor;
 mod kubectl;
+mod state;
 mod tui;
 mod vim;
 

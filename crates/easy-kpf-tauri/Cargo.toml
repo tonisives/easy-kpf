@@ -5,6 +5,9 @@ description = "Easy KPF - Kubernetes Port Forward Manager (Tauri GUI)"
 authors = ["you"]
 edition = "2021"
 
+[lints]
+workspace = true
+
 [lib]
 name = "easy_kpf_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]

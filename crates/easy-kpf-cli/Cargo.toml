@@ -5,6 +5,9 @@ description = "Easy KPF - CLI/TUI for kubectl port forward management"
 authors = ["you"]
 edition = "2021"
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "easykpf"
 path = "src/main.rs"

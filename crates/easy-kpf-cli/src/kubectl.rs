@@ -81,7 +81,7 @@ impl KubectlService {
       Ok(output) if output.status.success() => {
         String::from_utf8_lossy(&output.stdout)
           .split_whitespace()
-          .map(|s| s.to_string())
+          .map(std::string::ToString::to_string)
           .collect()
       }
       _ => vec![],

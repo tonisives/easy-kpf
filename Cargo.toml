@@ -5,3 +5,22 @@ members = [
     "crates/easy-kpf-tauri",
 ]
 resolver = "2"
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+unused = "warn"
+
+[workspace.lints.clippy]
+# Complexity
+cognitive_complexity = "warn"
+too_many_arguments = "warn"
+too_many_lines = "warn"
+
+# Style
+needless_pass_by_value = "warn"
+redundant_closure_for_method_calls = "warn"
+cloned_instead_of_copied = "warn"
+
+# Correctness
+unwrap_used = "warn"
+expect_used = "warn"

@@ -5,6 +5,9 @@ description = "Easy KPF - Core library for kubectl port forward management"
 authors = ["you"]
 edition = "2021"
 
+[lints]
+workspace = true
+
 [dependencies]
 tokio = { version = "1", features = ["sync", "process", "io-util"] }
 serde = { version = "1", features = ["derive"] }

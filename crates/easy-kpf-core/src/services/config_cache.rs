@@ -1,7 +1,7 @@
 use crate::error::{AppError, Result};
 use crate::services::ConfigService;
 use crate::types::PortForwardConfig;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 #[derive(Clone)]
@@ -14,6 +14,11 @@ pub struct ConfigCache {
 struct CacheData {
   configs: Option<Vec<PortForwardConfig>>,
   last_updated: Option<Instant>,
+}
+
+/// Helper to convert PoisonError to AppError
+fn lock_error<T>(_: PoisonError<T>) -> AppError {
+  AppError::System("Lock poisoned".to_string())
 }
 
 impl ConfigCache {
@@ -41,10 +46,10 @@ impl ConfigCache {
   }
 
   pub fn get_configs(&self) -> Result<Vec<PortForwardConfig>> {
-    let mut cache_data = self.cache.lock().unwrap();
+    let mut cache_data = self.cache.lock().map_err(lock_error)?;
 
-    if self.is_cache_valid(&cache_data) {
-      return Ok(cache_data.configs.as_ref().unwrap().clone());
+    if let Some(configs) = self.get_valid_cache(&cache_data) {
+      return Ok(configs);
     }
 
     // Cache is invalid, reload from service
@@ -56,10 +61,11 @@ impl ConfigCache {
   }
 
   #[allow(dead_code)]
-  pub fn invalidate(&self) {
-    let mut cache_data = self.cache.lock().unwrap();
+  pub fn invalidate(&self) -> Result<()> {
+    let mut cache_data = self.cache.lock().map_err(lock_error)?;
     cache_data.configs = None;
     cache_data.last_updated = None;
+    Ok(())
   }
 
   pub fn update_configs(&self, configs: Vec<PortForwardConfig>) -> Result<()> {
@@ -67,7 +73,7 @@ impl ConfigCache {
     self.config_service.save_port_forwards(&configs)?;
 
     // Update cache
-    let mut cache_data = self.cache.lock().unwrap();
+    let mut cache_data = self.cache.lock().map_err(lock_error)?;
     cache_data.configs = Some(configs);
     cache_data.last_updated = Some(Instant::now());
 
@@ -128,11 +134,15 @@ impl ConfigCache {
     self.update_configs(configs)
   }
 
-  fn is_cache_valid(&self, cache_data: &CacheData) -> bool {
-    if let (Some(_), Some(last_updated)) = (&cache_data.configs, cache_data.last_updated) {
-      last_updated.elapsed() < self.ttl
+  /// Get cached configs if valid, None otherwise
+  fn get_valid_cache(&self, cache_data: &CacheData) -> Option<Vec<PortForwardConfig>> {
+    let configs = cache_data.configs.as_ref()?;
+    let last_updated = cache_data.last_updated?;
+
+    if last_updated.elapsed() < self.ttl {
+      Some(configs.clone())
     } else {
-      false
+      None
     }
   }
 }

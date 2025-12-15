@@ -1,4 +1,5 @@
 use crate::kubectl::KubectlService;
+use crate::state::{AutocompleteResult, AutocompleteState, EditField};
 use crate::vim::VimState;
 use easy_kpf_core::{
   services::{ConfigService, ProcessManager},
@@ -10,13 +11,9 @@ use std::sync::mpsc as std_mpsc;
 use tokio::sync::mpsc;
 use tui_textarea::TextArea;
 
-#[derive(Debug)]
-pub enum AutocompleteResult {
-  Contexts(Vec<String>),
-  Namespaces(Vec<String>),
-  Services(Vec<String>),
-  Ports(Vec<String>),
-}
+/// Type alias for grouped configs by context
+/// Each entry is (context_name, Vec<(visual_index, config_index, config_ref)>)
+pub type ConfigsByContext<'a> = Vec<(String, Vec<(usize, usize, &'a PortForwardConfig)>)>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -89,34 +86,6 @@ pub enum ConfirmAction {
   CancelEdit(Mode), // Stores the mode to return to if user says "No"
 }
 
-#[derive(Debug, Clone)]
-pub struct AutocompleteState {
-  pub contexts: Vec<String>,
-  pub namespaces: Vec<String>,
-  pub services: Vec<String>,
-  pub ports: Vec<String>,
-  pub types: Vec<String>,
-  pub selected_index: usize,
-  pub loading: bool,
-  pub focused: bool,  // Whether suggestions panel is focused
-  pub typing: bool,   // Whether in typing mode (i to enter, Esc to exit)
-}
-
-impl Default for AutocompleteState {
-  fn default() -> Self {
-    Self {
-      contexts: vec![],
-      namespaces: vec![],
-      services: vec![],
-      ports: vec![],
-      types: vec!["kubectl".to_string(), "ssh".to_string()],
-      selected_index: 0,
-      loading: false,
-      focused: false,
-      typing: false,
-    }
-  }
-}
 
 impl App {
   pub fn new() -> Result<Self> {
@@ -340,7 +309,7 @@ impl App {
     self
       .selected_name()
       .and_then(|k| self.logs.get(&k))
-      .map(|v| v.as_slice())
+      .map(std::vec::Vec::as_slice)
       .unwrap_or(&[])
   }
 
@@ -349,7 +318,7 @@ impl App {
   }
 
   // Group configs by context for display, preserving visual order
-  pub fn configs_by_context(&self) -> Vec<(String, Vec<(usize, usize, &PortForwardConfig)>)> {
+  pub fn configs_by_context(&self) -> ConfigsByContext<'_> {
     // Returns: Vec<(context, Vec<(visual_index, config_index, config)>)>
     let mut groups: HashMap<String, Vec<(usize, usize, &PortForwardConfig)>> = HashMap::new();
 
@@ -412,7 +381,7 @@ impl App {
   pub fn derive_config_name(config: &PortForwardConfig) -> String {
     match config.forward_type {
       ForwardType::Ssh => {
-        let host = config.service.split('@').last().unwrap_or(&config.service);
+        let host = config.service.split('@').next_back().unwrap_or(&config.service);
         let port = config
           .ports
           .first()
@@ -454,82 +423,49 @@ impl App {
   }
 
   pub fn get_edit_field_value(&self, field_index: usize) -> String {
+    let field = match EditField::from_index(field_index) {
+      Some(f) => f,
+      None => return String::new(),
+    };
     self
       .edit_config
       .as_ref()
-      .map(|c| match field_index {
-        0 => c.name.clone(),
-        1 => c.context.clone(),
-        2 => c.namespace.clone(),
-        3 => c.service.clone(),
-        4 => c.ports.join(", "),
-        5 => c.local_interface.clone().unwrap_or_default(),
-        6 => match c.forward_type {
-          ForwardType::Kubectl => "kubectl".to_string(),
-          ForwardType::Ssh => "ssh".to_string(),
-        },
-        _ => String::new(),
-      })
+      .map(|c| field.get_value(c))
       .unwrap_or_default()
   }
 
   pub fn set_edit_field_value(&mut self, value: String) {
-    let field_index = self.edit_field_index;
-    let should_update_name = matches!(field_index, 3 | 4 | 6); // service, ports, or type
+    let field = match EditField::from_index(self.edit_field_index) {
+      Some(f) => f,
+      None => return,
+    };
 
     if let Some(config) = &mut self.edit_config {
-      match field_index {
-        0 => config.name = value,
-        1 => config.context = value,
-        2 => config.namespace = value,
-        3 => config.service = value,
-        4 => {
-          config.ports = value
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect()
-        }
-        5 => config.local_interface = if value.is_empty() { None } else { Some(value) },
-        6 => {
-          config.forward_type = if value.to_lowercase() == "ssh" {
-            ForwardType::Ssh
-          } else {
-            ForwardType::Kubectl
-          }
-        }
-        _ => {}
-      }
+      field.set_value(config, value);
     }
 
     // Update auto-generated name when service, ports, or type change
-    if should_update_name {
+    if field.triggers_name_generation() {
       self.update_auto_generated_name();
     }
   }
 
   pub fn edit_field_count(&self) -> usize {
-    7
+    EditField::count()
   }
 
   pub fn edit_field_name(&self, index: usize) -> &'static str {
-    match index {
-      0 => "Name",
-      1 => "Context",
-      2 => "Namespace",
-      3 => "Service",
-      4 => "Ports",
-      5 => "Local Interface",
-      6 => "Type (kubectl/ssh)",
-      _ => "",
-    }
+    EditField::from_index(index).map(|f| f.name()).unwrap_or("")
   }
 
   pub fn edit_field_description(&self, index: usize) -> &'static str {
-    match index {
-      5 => "Optional, e.g. 127.0.0.2 to avoid port conflicts",
-      _ => "",
-    }
+    EditField::from_index(index)
+      .map(|f| f.description())
+      .unwrap_or("")
+  }
+
+  pub fn current_edit_field(&self) -> Option<EditField> {
+    EditField::from_index(self.edit_field_index)
   }
 
   pub fn next_edit_field(&mut self) {
@@ -540,14 +476,16 @@ impl App {
     self.autocomplete.focused = false;
     self.autocomplete.typing = false;
     // Auto-load suggestions for supported fields
-    if self.field_supports_autocomplete(self.edit_field_index) {
-      self.load_autocomplete();
-      // For static fields (type), sync selection immediately
-      if self.edit_field_index == 6 {
-        self.sync_autocomplete_selection();
+    if let Some(field) = self.current_edit_field() {
+      if field.supports_autocomplete() {
+        self.load_autocomplete();
+        // For static fields (type), sync selection immediately
+        if field == EditField::ForwardType {
+          self.sync_autocomplete_selection();
+        }
+      } else {
+        self.clear_autocomplete();
       }
-    } else {
-      self.clear_autocomplete();
     }
   }
 
@@ -563,19 +501,17 @@ impl App {
     self.autocomplete.focused = false;
     self.autocomplete.typing = false;
     // Auto-load suggestions for supported fields
-    if self.field_supports_autocomplete(self.edit_field_index) {
-      self.load_autocomplete();
-      // For static fields (type), sync selection immediately
-      if self.edit_field_index == 6 {
-        self.sync_autocomplete_selection();
+    if let Some(field) = self.current_edit_field() {
+      if field.supports_autocomplete() {
+        self.load_autocomplete();
+        // For static fields (type), sync selection immediately
+        if field == EditField::ForwardType {
+          self.sync_autocomplete_selection();
+        }
+      } else {
+        self.clear_autocomplete();
       }
-    } else {
-      self.clear_autocomplete();
     }
-  }
-
-  fn field_supports_autocomplete(&self, field_index: usize) -> bool {
-    matches!(field_index, 1 | 2 | 3 | 4 | 6)
   }
 
   #[allow(dead_code)]
