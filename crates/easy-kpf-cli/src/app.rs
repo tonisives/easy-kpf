@@ -61,6 +61,7 @@ pub struct App {
   pub log_sender: mpsc::Sender<(String, LogEntry)>,
   // Edit mode state
   pub edit_config: Option<PortForwardConfig>,
+  pub edit_original_config: Option<PortForwardConfig>, // Original config for change detection
   pub edit_field_index: usize,
   pub edit_field_value: String,
   pub edit_cursor_pos: usize, // Cursor position within edit_field_value
@@ -144,6 +145,7 @@ impl App {
       log_receiver: Some(log_receiver),
       log_sender,
       edit_config: None,
+      edit_original_config: None,
       edit_field_index: 0,
       edit_field_value: String::new(),
       edit_cursor_pos: 0,
@@ -367,6 +369,7 @@ impl App {
 
   pub fn enter_edit_mode(&mut self) {
     if let Some(config) = self.selected_config().cloned() {
+      self.edit_original_config = Some(config.clone()); // Save original for change detection
       self.edit_config = Some(config);
       self.edit_field_index = 0;
       self.edit_field_value = self.get_edit_field_value(0);
@@ -385,7 +388,7 @@ impl App {
       .map(|c| (c.context.clone(), c.namespace.clone()))
       .unwrap_or_else(|| (String::new(), "default".to_string()));
 
-    self.edit_config = Some(PortForwardConfig {
+    let new_config = PortForwardConfig {
       name: String::new(),
       context: default_context,
       namespace: default_namespace,
@@ -393,7 +396,9 @@ impl App {
       ports: vec![],
       local_interface: None,
       forward_type: ForwardType::Kubectl,
-    });
+    };
+    self.edit_original_config = Some(new_config.clone()); // Save original for change detection
+    self.edit_config = Some(new_config);
     self.edit_field_index = 0;
     self.edit_field_value = String::new();
     self.edit_cursor_pos = 0;
@@ -686,8 +691,26 @@ impl App {
 
   pub fn cancel_edit(&mut self) {
     self.edit_config = None;
+    self.edit_original_config = None;
     self.autocomplete = AutocompleteState::default();
     self.mode = Mode::Normal;
+  }
+
+  /// Check if the edit form has unsaved changes compared to the original config
+  pub fn has_unsaved_changes(&self) -> bool {
+    let (current, original) = match (&self.edit_config, &self.edit_original_config) {
+      (Some(c), Some(o)) => (c, o),
+      _ => return false,
+    };
+
+    // Compare all fields
+    current.name != original.name
+      || current.context != original.context
+      || current.namespace != original.namespace
+      || current.service != original.service
+      || current.ports != original.ports
+      || current.local_interface != original.local_interface
+      || current.forward_type != original.forward_type
   }
 
   pub fn get_config_file_path(&self) -> PathBuf {

@@ -249,10 +249,17 @@ fn handle_edit_mode(app: &mut App, key: KeyEvent) -> Result<()> {
   // Default mode: j/k navigate suggestions, i enters typing mode
   match key.code {
     KeyCode::Esc => {
-      // Show confirmation dialog before canceling
-      let current_mode = app.mode;
-      app.confirm_action = Some(ConfirmAction::CancelEdit(current_mode));
-      app.mode = Mode::Confirm;
+      // Sync current field value before checking for changes
+      app.set_edit_field_value(app.edit_field_value.clone());
+
+      // Only show confirmation if there are unsaved changes
+      if app.has_unsaved_changes() {
+        let current_mode = app.mode;
+        app.confirm_action = Some(ConfirmAction::CancelEdit(current_mode));
+        app.mode = Mode::Confirm;
+      } else {
+        app.cancel_edit();
+      }
     }
     // : to enter command mode (vim-style :w, :q)
     KeyCode::Char(':') => {
@@ -460,10 +467,15 @@ fn handle_command_mode(app: &mut App, key: KeyEvent) -> Result<()> {
           app.set_status("Configuration saved");
         }
         "q" | "quit" => {
-          // Quit without saving - show confirmation
-          let current_mode = app.mode;
-          app.confirm_action = Some(ConfirmAction::CancelEdit(current_mode));
-          app.mode = Mode::Confirm;
+          // Quit without saving - show confirmation only if there are changes
+          app.set_edit_field_value(app.edit_field_value.clone());
+          if app.has_unsaved_changes() {
+            let current_mode = app.mode;
+            app.confirm_action = Some(ConfirmAction::CancelEdit(current_mode));
+            app.mode = Mode::Confirm;
+          } else {
+            app.cancel_edit();
+          }
         }
         "wq" | "x" => {
           // Save and quit
