@@ -122,8 +122,6 @@ jobs:
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -172,7 +170,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Find the DMG file in the artifacts
-          DMG_PATH=$(find src-tauri/target -name "*.dmg" -type f 2>/dev/null | head -1)
+          DMG_PATH=$(find target -name "*.dmg" -type f 2>/dev/null | head -1)
           if [ -n "$DMG_PATH" ]; then
             NEW_NAME="EasyKpf_${{ matrix.arch }}.dmg"
             # Upload with new name to the release
