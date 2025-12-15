@@ -180,27 +180,32 @@ jobs:
 
   # Update Homebrew tap with new SHA256 checksums
   update-homebrew:
-    needs: cli
+    needs: [cli, gui]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      - name: Wait for release assets
-        run: sleep 30
-
       - name: Download release artifacts and calculate checksums
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Download artifacts
+          # Download CLI artifacts
           curl -sL "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/easykpf-macos-aarch64.tar.gz" -o macos-arm.tar.gz
           curl -sL "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/easykpf-macos-x86_64.tar.gz" -o macos-intel.tar.gz
           curl -sL "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/easykpf-linux-x86_64.tar.gz" -o linux.tar.gz
 
-          # Calculate checksums
+          # Download GUI artifacts (DMG)
+          curl -sL "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/EasyKpf_aarch64.dmg" -o dmg-arm.dmg
+          curl -sL "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/EasyKpf_x64.dmg" -o dmg-intel.dmg
+
+          # Calculate CLI checksums
           echo "SHA256_MACOS_ARM=$(sha256sum macos-arm.tar.gz | cut -d' ' -f1)" >> $GITHUB_ENV
           echo "SHA256_MACOS_INTEL=$(sha256sum macos-intel.tar.gz | cut -d' ' -f1)" >> $GITHUB_ENV
           echo "SHA256_LINUX=$(sha256sum linux.tar.gz | cut -d' ' -f1)" >> $GITHUB_ENV
+
+          # Calculate GUI checksums
+          echo "SHA256_DMG_ARM=$(sha256sum dmg-arm.dmg | cut -d' ' -f1)" >> $GITHUB_ENV
+          echo "SHA256_DMG_INTEL=$(sha256sum dmg-intel.dmg | cut -d' ' -f1)" >> $GITHUB_ENV
 
       - name: Checkout homebrew-tap
         uses: actions/checkout@v4
@@ -209,15 +214,11 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
 
-      - name: Update formula
+      - name: Update formula and cask
         run: |
           cd homebrew-tap
 
-          # Update SHA256 for macOS ARM
-          sed -i 's|sha256 ".*"  # macos-aarch64|sha256 "'"$SHA256_MACOS_ARM"'"  # macos-aarch64|' Formula/easykpf.rb
-          sed -i 's|sha256 :no_check$|sha256 "'"$SHA256_MACOS_ARM"'"  # macos-aarch64|' Formula/easykpf.rb
-
-          # Use a more targeted approach with awk
+          # Update Formula with awk
           awk -v arm="$SHA256_MACOS_ARM" -v intel="$SHA256_MACOS_INTEL" -v linux="$SHA256_LINUX" '
             /on_arm do/ { in_arm=1 }
             /on_intel do/ && in_macos { in_intel=1; in_arm=0 }
@@ -231,11 +232,25 @@ jobs:
             { print }
           ' Formula/easykpf.rb > Formula/easykpf.rb.tmp && mv Formula/easykpf.rb.tmp Formula/easykpf.rb
 
+          # Update Cask with arch-specific checksums
+          awk -v arm="$SHA256_DMG_ARM" -v intel="$SHA256_DMG_INTEL" '
+            /^cask/ { in_cask=1 }
+            /sha256.*:no_check/ && in_cask {
+              print "  sha256 arm: \"" arm "\", intel: \"" intel "\""
+              next
+            }
+            /sha256 arm:/ && in_cask {
+              print "  sha256 arm: \"" arm "\", intel: \"" intel "\""
+              next
+            }
+            { print }
+          ' Casks/easy-kpf.rb > Casks/easy-kpf.rb.tmp && mv Casks/easy-kpf.rb.tmp Casks/easy-kpf.rb
+
       - name: Commit and push
         run: |
           cd homebrew-tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/easykpf.rb
+          git add Formula/easykpf.rb Casks/easy-kpf.rb
           git diff --staged --quiet || git commit -m "Update easykpf to ${{ github.ref_name }}"
           git push
