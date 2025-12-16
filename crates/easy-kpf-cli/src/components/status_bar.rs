@@ -1,13 +1,15 @@
 use crate::app::{App, Mode, Panel};
 use ratatui::{
   layout::Rect,
-  style::{Color, Modifier, Style},
+  style::{Modifier, Style},
   text::{Line, Span},
   widgets::Paragraph,
   Frame,
 };
 
 pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
+  let theme = &app.theme;
+
   let bindings = match app.mode {
     Mode::Normal => {
       if app.active_panel == Panel::ServiceList {
@@ -53,17 +55,13 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
   let spans: Vec<Span> = bindings
     .iter()
     .flat_map(|(key, desc)| {
-      let spans = vec![
+      vec![
         Span::styled(
           format!(" {} ", key),
-          Style::default()
-            .fg(Color::Black)
-            .bg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
+          theme.status_key().add_modifier(Modifier::BOLD),
         ),
-        Span::styled(format!("{}  ", desc), Style::default().fg(Color::Gray)),
-      ];
-      spans
+        Span::styled(format!("{}  ", desc), theme.text_secondary()),
+      ]
     })
     .collect();
 
@@ -74,13 +72,12 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     line_spans.push(Span::raw("  "));
     line_spans.push(Span::styled(
       msg,
-      Style::default()
-        .fg(Color::Yellow)
-        .add_modifier(Modifier::ITALIC),
+      theme.warning().add_modifier(Modifier::ITALIC),
     ));
   }
 
-  let paragraph = Paragraph::new(Line::from(line_spans)).style(Style::default().bg(Color::Black));
+  let paragraph =
+    Paragraph::new(Line::from(line_spans)).style(Style::default().bg(theme.status_bg));
 
   frame.render_widget(paragraph, area);
 }

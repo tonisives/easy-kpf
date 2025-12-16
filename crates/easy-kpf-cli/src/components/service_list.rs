@@ -1,21 +1,23 @@
 use crate::app::{App, Mode, Panel};
 use ratatui::{
   layout::Rect,
-  style::{Color, Modifier, Style},
+  style::{Modifier, Style},
   text::{Line, Span},
   widgets::{Block, BorderType, Borders, List, ListItem},
   Frame,
 };
 
 pub fn draw_service_list(frame: &mut Frame, app: &App, area: Rect) {
+  let theme = &app.theme;
   let is_focused = app.active_panel == Panel::ServiceList;
   let is_visual_mode = app.mode == Mode::Visual;
-  let border_color = if is_visual_mode {
-    Color::Magenta
+
+  let border_style = if is_visual_mode {
+    theme.border_visual()
   } else if is_focused {
-    Color::Cyan
+    theme.border_focused()
   } else {
-    Color::DarkGray
+    theme.border()
   };
 
   let groups = app.configs_by_context();
@@ -25,9 +27,7 @@ pub fn draw_service_list(frame: &mut Frame, app: &App, area: Rect) {
     // Context header
     items.push(ListItem::new(Line::from(vec![Span::styled(
       format!(" [{}]", context),
-      Style::default()
-        .fg(Color::Yellow)
-        .add_modifier(Modifier::BOLD),
+      theme.warning().add_modifier(Modifier::BOLD),
     )])));
 
     for (visual_idx, _config_idx, config) in configs {
@@ -38,26 +38,22 @@ pub fn draw_service_list(frame: &mut Frame, app: &App, area: Rect) {
 
       let checkbox = if is_running { "[x]" } else { "[ ]" };
       let status = if is_running { "Run" } else { "Stop" };
-      let status_color = if is_running {
-        Color::Green
+      let status_style = if is_running {
+        theme.success()
       } else {
-        Color::DarkGray
+        theme.text_tertiary()
       };
 
-      // Style: visual selection gets magenta bg, cursor gets darker highlight
+      // Style: visual selection gets purple bg, cursor gets highlight
       let style = if is_cursor && is_in_visual {
         // Cursor within visual selection
-        Style::default()
-          .bg(Color::Rgb(100, 50, 100)) // Darker magenta for cursor
-          .add_modifier(Modifier::BOLD)
+        theme.visual_cursor()
       } else if is_in_visual {
         // Visual selection (not cursor)
-        Style::default().bg(Color::Rgb(60, 30, 60)) // Subtle magenta for selection
+        theme.visual_selection()
       } else if is_cursor {
         // Normal cursor (not in visual mode)
-        Style::default()
-          .bg(Color::DarkGray)
-          .add_modifier(Modifier::BOLD)
+        theme.cursor()
       } else {
         Style::default()
       };
@@ -78,18 +74,18 @@ pub fn draw_service_list(frame: &mut Frame, app: &App, area: Rect) {
         Span::raw(indicator),
         Span::styled(
           checkbox,
-          Style::default().fg(if is_running {
-            Color::Green
+          if is_running {
+            theme.success()
           } else {
-            Color::DarkGray
-          }),
+            theme.text_tertiary()
+          },
         ),
         Span::raw(" "),
-        Span::styled(&config.name, Style::default().fg(Color::White)),
+        Span::styled(&config.name, theme.text()),
         Span::raw("  "),
-        Span::styled(ports_str, Style::default().fg(Color::Cyan)),
+        Span::styled(ports_str, theme.accent()),
         Span::raw("  "),
-        Span::styled(status, Style::default().fg(status_color)),
+        Span::styled(status, status_style),
       ]);
 
       items.push(ListItem::new(line).style(style));
@@ -99,7 +95,7 @@ pub fn draw_service_list(frame: &mut Frame, app: &App, area: Rect) {
   if items.is_empty() {
     items.push(ListItem::new(Line::from(vec![Span::styled(
       "  No port forwards configured. Press 'n' to create one.",
-      Style::default().fg(Color::DarkGray),
+      theme.text_tertiary(),
     )])));
   }
 
@@ -119,7 +115,7 @@ pub fn draw_service_list(frame: &mut Frame, app: &App, area: Rect) {
       .title(title)
       .borders(Borders::ALL)
       .border_type(BorderType::Rounded)
-      .border_style(Style::default().fg(border_color)),
+      .border_style(border_style),
   );
 
   frame.render_widget(list, area);

@@ -4,6 +4,7 @@ mod components;
 mod executor;
 mod kubectl;
 mod state;
+mod theme;
 mod tui;
 mod vim;
 

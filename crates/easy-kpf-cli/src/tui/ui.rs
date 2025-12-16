@@ -5,7 +5,7 @@ use crate::components::{
 };
 use ratatui::{
   layout::{Constraint, Direction, Layout, Rect},
-  style::{Color, Modifier, Style},
+  style::Modifier,
   widgets::{Block, BorderType, Borders, Clear, Paragraph},
   Frame,
 };
@@ -34,6 +34,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
 }
 
 fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
+  let theme = &app.theme;
   let chunks = Layout::default()
     .direction(Direction::Horizontal)
     .constraints([Constraint::Min(20), Constraint::Length(12)])
@@ -44,26 +45,24 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
     draw_search_bar(frame, app, chunks[0]);
   } else {
     let title = Paragraph::new(" Easy KPF")
-      .style(
-        Style::default()
-          .fg(Color::Cyan)
-          .add_modifier(Modifier::BOLD),
-      )
+      .style(theme.title_style().add_modifier(Modifier::BOLD))
       .block(
         Block::default()
           .borders(Borders::ALL)
-          .border_type(BorderType::Rounded),
+          .border_type(BorderType::Rounded)
+          .border_style(theme.border()),
       );
     frame.render_widget(title, chunks[0]);
   }
 
   // Help hint
   let help_hint = Paragraph::new(" [?] Help ")
-    .style(Style::default().fg(Color::DarkGray))
+    .style(theme.text_tertiary())
     .block(
       Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded),
+        .border_type(BorderType::Rounded)
+        .border_style(theme.border()),
     );
   frame.render_widget(help_hint, chunks[1]);
 }
@@ -79,6 +78,7 @@ fn draw_main_content(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_confirm_dialog(frame: &mut Frame, app: &App) {
+  let theme = &app.theme;
   let area = centered_rect(50, 25, frame.area());
   frame.render_widget(Clear, area);
 
@@ -108,15 +108,13 @@ fn draw_confirm_dialog(frame: &mut Frame, app: &App) {
     None => "Confirm?".to_string(),
   };
 
-  let popup = Paragraph::new(message)
-    .style(Style::default().fg(Color::Yellow))
-    .block(
-      Block::default()
-        .title(" Confirm ")
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Yellow)),
-    );
+  let popup = Paragraph::new(message).style(theme.warning()).block(
+    Block::default()
+      .title(" Confirm ")
+      .borders(Borders::ALL)
+      .border_type(BorderType::Rounded)
+      .border_style(theme.warning()),
+  );
 
   frame.render_widget(popup, area);
 }

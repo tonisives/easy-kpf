@@ -1,5 +1,6 @@
 use crate::kubectl::KubectlService;
 use crate::state::{AutocompleteResult, AutocompleteState, EditField};
+use crate::theme::{Theme, ThemeMode};
 use crate::vim::VimState;
 use easy_kpf_core::{
   services::{ConfigService, ProcessManager},
@@ -56,6 +57,8 @@ pub struct App {
   pub process_manager: ProcessManager,
   pub log_receiver: Option<mpsc::Receiver<(String, LogEntry)>>,
   pub log_sender: mpsc::Sender<(String, LogEntry)>,
+  // Theme (detected from system)
+  pub theme: Theme,
   // Edit mode state
   pub edit_config: Option<PortForwardConfig>,
   pub edit_original_config: Option<PortForwardConfig>, // Original config for change detection
@@ -95,6 +98,10 @@ impl App {
     let kubectl_service = KubectlService::new(config_service.clone());
     let (autocomplete_tx, autocomplete_rx) = std_mpsc::channel();
 
+    // Detect system theme
+    let theme_mode = ThemeMode::detect();
+    let theme = Theme::for_mode(theme_mode);
+
     let mut app = Self {
       mode: Mode::Normal,
       active_panel: Panel::ServiceList,
@@ -112,6 +119,7 @@ impl App {
       process_manager,
       log_receiver: Some(log_receiver),
       log_sender,
+      theme,
       edit_config: None,
       edit_original_config: None,
       edit_field_index: 0,

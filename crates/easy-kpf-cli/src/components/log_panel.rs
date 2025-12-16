@@ -1,18 +1,19 @@
 use crate::app::{App, Panel};
 use ratatui::{
   layout::Rect,
-  style::{Color, Style},
   text::{Line, Span},
   widgets::{Block, BorderType, Borders, Paragraph, Wrap},
   Frame,
 };
 
 pub fn draw_log_panel(frame: &mut Frame, app: &App, area: Rect) {
+  let theme = &app.theme;
   let is_focused = app.active_panel == Panel::Logs;
-  let border_color = if is_focused {
-    Color::Cyan
+
+  let border_style = if is_focused {
+    theme.border_focused()
   } else {
-    Color::DarkGray
+    theme.border()
   };
 
   let title = app
@@ -25,7 +26,7 @@ pub fn draw_log_panel(frame: &mut Frame, app: &App, area: Rect) {
   let lines: Vec<Line> = if logs.is_empty() {
     vec![Line::from(Span::styled(
       "  No logs yet. Start a port forward to see output.",
-      Style::default().fg(Color::DarkGray),
+      theme.text_tertiary(),
     ))]
   } else {
     let visible_height = area.height.saturating_sub(2) as usize;
@@ -33,12 +34,12 @@ pub fn draw_log_panel(frame: &mut Frame, app: &App, area: Rect) {
     logs[start..]
       .iter()
       .map(|entry| {
-        let color = if entry.is_stderr {
-          Color::Red
+        let style = if entry.is_stderr {
+          theme.error()
         } else {
-          Color::White
+          theme.text()
         };
-        Line::from(Span::styled(&entry.line, Style::default().fg(color)))
+        Line::from(Span::styled(&entry.line, style))
       })
       .collect()
   };
@@ -49,7 +50,7 @@ pub fn draw_log_panel(frame: &mut Frame, app: &App, area: Rect) {
         .title(title)
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(border_color)),
+        .border_style(border_style),
     )
     .wrap(Wrap { trim: false });
 
