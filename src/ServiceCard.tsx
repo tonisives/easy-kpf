@@ -10,7 +10,7 @@ type ServiceCardProps = {
   ports: string
   isRunning: boolean
   isLoading: boolean
-  error?: string
+  errors?: string[]
   onStart: () => void
   onStop: () => void
   onSettings: () => void
@@ -25,7 +25,7 @@ let ServiceCard = ({
   ports,
   isRunning,
   isLoading,
-  error,
+  errors,
   onStart,
   onStop,
   onSettings,
@@ -72,10 +72,14 @@ let ServiceCard = ({
         </div>
       </div>
 
-      {error && (
+      {errors && errors.length > 0 && (
         <div className="service-error">
-          <span className="service-error-text">{error}</span>
-          <button onClick={onClearError} className="service-error-close" title="Clear error">
+          <div className="service-error-text">
+            {errors.map((err, index) => (
+              <div key={index} className="service-error-line">{err}</div>
+            ))}
+          </div>
+          <button onClick={onClearError} className="service-error-close" title="Clear errors">
             ×
           </button>
         </div>

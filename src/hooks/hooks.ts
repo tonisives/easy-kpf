@@ -1,10 +1,16 @@
 import { invoke } from "@tauri-apps/api/core"
+import { listen } from "@tauri-apps/api/event"
 import { useEffect, useState } from "react"
+
+type ServiceErrorEvent = {
+  service_name: string
+  error: string
+}
 
 export type ServiceStatus = {
   name: string
   running: boolean
-  error?: string
+  errors?: string[]
 }
 
 export type ForwardType = "Kubectl" | "Ssh"
@@ -75,9 +81,9 @@ export let useConfigs = (
           prev.map((service) => ({
             ...service,
             running: !stoppedServices.includes(service.name) && service.running,
-            error: stoppedServices.includes(service.name) 
-              ? "Port forward stopped unexpectedly" 
-              : service.error,
+            errors: stoppedServices.includes(service.name)
+              ? [...(service.errors || []), "Port forward stopped unexpectedly"]
+              : service.errors,
           })),
         )
       }
@@ -90,14 +96,27 @@ export let useConfigs = (
     loadConfigs()
       .then(syncWithExistingProcesses)
       .then(updateServiceStatus)
-    
+
     // Set up periodic verification of port forwards
     let verificationInterval = setInterval(() => {
       verifyPortForwards()
     }, 5000) // Check every 5 seconds
-    
+
+    // Listen for runtime errors from port forward processes
+    let unlistenPromise = listen<ServiceErrorEvent>("service-error", (event) => {
+      let { service_name, error } = event.payload
+      setServices((prev) =>
+        prev.map((service) =>
+          service.name === service_name
+            ? { ...service, errors: [...(service.errors || []), error] }
+            : service,
+        ),
+      )
+    })
+
     return () => {
       clearInterval(verificationInterval)
+      unlistenPromise.then((unlisten) => unlisten())
     }
   }, [])
 
@@ -105,7 +124,7 @@ export let useConfigs = (
     setLoading(serviceKey)
     setServices((prev) =>
       prev.map((service) =>
-        service.name === serviceKey ? { ...service, error: undefined } : service,
+        service.name === serviceKey ? { ...service, errors: undefined } : service,
       ),
     )
     try {
@@ -117,13 +136,13 @@ export let useConfigs = (
       if (errorMessage.includes("port forwarding is already running")) {
         setServices((prev) =>
           prev.map((service) =>
-            service.name === serviceKey ? { ...service, running: true, error: undefined } : service,
+            service.name === serviceKey ? { ...service, running: true, errors: undefined } : service,
           ),
         )
       } else {
         setServices((prev) =>
           prev.map((service) =>
-            service.name === serviceKey ? { ...service, error: errorMessage } : service,
+            service.name === serviceKey ? { ...service, errors: [errorMessage] } : service,
           ),
         )
       }
@@ -242,7 +261,7 @@ export let useConfigs = (
     setLoading(serviceName)
     setServices((prev) =>
       prev.map((service) =>
-        service.name === serviceName ? { ...service, error: undefined } : service,
+        service.name === serviceName ? { ...service, errors: undefined } : service,
       ),
     )
     try {
@@ -255,14 +274,14 @@ export let useConfigs = (
         setServices((prev) =>
           prev.map((service) =>
             service.name === serviceName
-              ? { ...service, running: false, error: undefined }
+              ? { ...service, running: false, errors: undefined }
               : service,
           ),
         )
       } else {
         setServices((prev) =>
           prev.map((service) =>
-            service.name === serviceName ? { ...service, error: errorMessage } : service,
+            service.name === serviceName ? { ...service, errors: [errorMessage] } : service,
           ),
         )
       }
@@ -274,7 +293,7 @@ export let useConfigs = (
   let clearServiceError = (serviceName: string) => {
     setServices((prev) =>
       prev.map((service) =>
-        service.name === serviceName ? { ...service, error: undefined } : service,
+        service.name === serviceName ? { ...service, errors: undefined } : service,
       ),
     )
   }
@@ -286,7 +305,7 @@ export let useConfigs = (
   let reconnectAll = async () => {
     let disconnectedServices = services.filter((service) => {
       let config = configs.find((c) => c.name === service.name)
-      return config && !service.running && service.error
+      return config && !service.running && service.errors && service.errors.length > 0
     })
 
     if (disconnectedServices.length === 0) {

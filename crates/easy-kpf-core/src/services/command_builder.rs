@@ -13,6 +13,95 @@ impl KubectlCommandBuilder {
     }
   }
 
+  /// Build PATH environment variable that includes common locations for credential plugins.
+  /// macOS apps launched from Finder don't inherit shell PATH, so we need to construct one.
+  fn build_path_env() -> String {
+    let mut paths = Vec::new();
+
+    // Start with current PATH if available
+    if let Ok(current_path) = std::env::var("PATH") {
+      paths.push(current_path);
+    }
+
+    // Add common locations for credential plugins (gke-gcloud-auth-plugin, aws-iam-authenticator, etc.)
+    let additional_paths = [
+      "/usr/local/bin",
+      "/opt/homebrew/bin",
+      "/opt/homebrew/sbin",
+      "/usr/bin",
+      "/bin",
+      "/usr/sbin",
+      "/sbin",
+    ];
+
+    for path in additional_paths {
+      if std::path::Path::new(path).exists() {
+        paths.push(path.to_string());
+      }
+    }
+
+    // Add user-specific paths
+    if let Ok(home) = std::env::var("HOME") {
+      let user_paths = [
+        format!("{}/.local/bin", home),
+        format!("{}/bin", home),
+        format!("{}/google-cloud-sdk/bin", home),
+        format!("{}/.krew/bin", home),
+      ];
+      for path in user_paths {
+        if std::path::Path::new(&path).exists() {
+          paths.push(path);
+        }
+      }
+    }
+
+    paths.join(":")
+  }
+
+  /// Get environment variables needed for credential plugins to work.
+  fn get_credential_env_vars() -> Vec<(String, String)> {
+    let mut env_vars = Vec::new();
+
+    // Pass through PATH so credential plugins can be found
+    env_vars.push(("PATH".to_string(), Self::build_path_env()));
+
+    // Pass through HOME - needed by many credential plugins
+    if let Ok(home) = std::env::var("HOME") {
+      env_vars.push(("HOME".to_string(), home));
+    }
+
+    // Pass through cloud provider credentials if set
+    let passthrough_vars = [
+      // Google Cloud
+      "GOOGLE_APPLICATION_CREDENTIALS",
+      "CLOUDSDK_CONFIG",
+      "CLOUDSDK_ACTIVE_CONFIG_NAME",
+      // AWS
+      "AWS_PROFILE",
+      "AWS_DEFAULT_PROFILE",
+      "AWS_CONFIG_FILE",
+      "AWS_SHARED_CREDENTIALS_FILE",
+      "AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY",
+      "AWS_SESSION_TOKEN",
+      "AWS_REGION",
+      "AWS_DEFAULT_REGION",
+      // Azure
+      "AZURE_CONFIG_DIR",
+      // Generic
+      "USER",
+      "SHELL",
+    ];
+
+    for var in passthrough_vars {
+      if let Ok(value) = std::env::var(var) {
+        env_vars.push((var.to_string(), value));
+      }
+    }
+
+    env_vars
+  }
+
   pub fn build_port_forward_command(
     &self,
     config: &PortForwardConfig,
@@ -39,7 +128,10 @@ impl KubectlCommandBuilder {
     // Add port mappings
     args.extend(config.ports.clone());
 
-    let mut env_vars = Vec::new();
+    // Get environment variables for credential plugins
+    let mut env_vars = Self::get_credential_env_vars();
+
+    // Add KUBECONFIG if specified
     if let Some(ref kubeconfig) = self.kubeconfig_path {
       env_vars.push(("KUBECONFIG".to_string(), kubeconfig.clone()));
     }

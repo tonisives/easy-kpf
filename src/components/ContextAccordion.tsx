@@ -90,7 +90,7 @@ let ContextAccordion = ({
                   ports={displayInfo.ports}
                   isRunning={service?.running || false}
                   isLoading={loading === config.name}
-                  error={service?.error}
+                  errors={service?.errors}
                   onStart={() => onStart(config.name)}
                   onStop={() => onStop(config.name)}
                   onSettings={() => onSettings(config.name)}

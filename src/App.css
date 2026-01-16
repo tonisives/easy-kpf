@@ -354,6 +354,17 @@ button:disabled {
   color: var(--danger-color);
   line-height: 1.4;
   word-break: break-word;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.service-error-line {
+  padding: 2px 0;
+  border-bottom: 1px solid var(--danger-bg);
+}
+
+.service-error-line:last-child {
+  border-bottom: none;
 }
 
 .service-error-close {

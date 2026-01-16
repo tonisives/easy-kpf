@@ -170,7 +170,7 @@ function App() {
           <button
             onClick={() => reconnectAll()}
             className="add-button"
-            disabled={!services.some((s) => !s.running && s.error)}
+            disabled={!services.some((s) => !s.running && s.errors && s.errors.length > 0)}
             title="Reconnect all disconnected services"
           >
             Reconnect All
@@ -276,7 +276,7 @@ function App() {
                       ports={displayInfo.ports}
                       isRunning={service?.running || false}
                       isLoading={loading === config.name}
-                      error={service?.error}
+                      errors={service?.errors}
                       onStart={() => startPortForward(config.name)}
                       onStop={() => stopPortForward(config.name)}
                       onSettings={() => setActiveServiceSettings(config.name)}

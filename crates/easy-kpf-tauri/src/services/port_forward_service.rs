@@ -4,9 +4,17 @@ use easy_kpf_core::services::{
   ProcessManager, SshCommandBuilder, SystemInterfaceManager,
 };
 use easy_kpf_core::types::{ForwardType, PortForwardConfig};
+use serde::Serialize;
+use tauri::Emitter;
 
 use super::KubectlOperations;
 use tauri_plugin_shell::ShellExt;
+
+#[derive(Clone, Serialize)]
+pub struct ServiceErrorEvent {
+  pub service_name: String,
+  pub error: String,
+}
 
 pub struct PortForwardService {
   app_handle: tauri::AppHandle,
@@ -148,6 +156,7 @@ impl PortForwardService {
 
     // Monitor process output in background
     let service_name = config.name.clone();
+    let app_handle = self.app_handle.clone();
     tauri::async_runtime::spawn(async move {
       use tauri_plugin_shell::process::CommandEvent;
       let mut rx = rx;
@@ -157,10 +166,27 @@ impl PortForwardService {
             log::info!("[{}] {}", service_name, String::from_utf8_lossy(&line));
           }
           CommandEvent::Stderr(line) => {
-            log::error!("[{}] {}", service_name, String::from_utf8_lossy(&line));
+            let error_text = String::from_utf8_lossy(&line).to_string();
+            log::error!("[{}] {}", service_name, error_text);
+            // Emit error event to frontend
+            let _ = app_handle.emit(
+              "service-error",
+              ServiceErrorEvent {
+                service_name: service_name.clone(),
+                error: error_text,
+              },
+            );
           }
           CommandEvent::Error(err) => {
             log::error!("[{}] Process error: {}", service_name, err);
+            // Emit error event to frontend
+            let _ = app_handle.emit(
+              "service-error",
+              ServiceErrorEvent {
+                service_name: service_name.clone(),
+                error: format!("Process error: {}", err),
+              },
+            );
           }
           CommandEvent::Terminated(payload) => {
             log::warn!(
@@ -213,6 +239,7 @@ impl PortForwardService {
 
     // Monitor process output in background
     let service_name = config.name.clone();
+    let app_handle = self.app_handle.clone();
     tauri::async_runtime::spawn(async move {
       use tauri_plugin_shell::process::CommandEvent;
       let mut rx = rx;
@@ -222,10 +249,27 @@ impl PortForwardService {
             log::info!("[{}] {}", service_name, String::from_utf8_lossy(&line));
           }
           CommandEvent::Stderr(line) => {
-            log::error!("[{}] {}", service_name, String::from_utf8_lossy(&line));
+            let error_text = String::from_utf8_lossy(&line).to_string();
+            log::error!("[{}] {}", service_name, error_text);
+            // Emit error event to frontend
+            let _ = app_handle.emit(
+              "service-error",
+              ServiceErrorEvent {
+                service_name: service_name.clone(),
+                error: error_text,
+              },
+            );
           }
           CommandEvent::Error(err) => {
             log::error!("[{}] Process error: {}", service_name, err);
+            // Emit error event to frontend
+            let _ = app_handle.emit(
+              "service-error",
+              ServiceErrorEvent {
+                service_name: service_name.clone(),
+                error: format!("Process error: {}", err),
+              },
+            );
           }
           CommandEvent::Terminated(payload) => {
             log::warn!(
