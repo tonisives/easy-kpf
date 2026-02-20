@@ -93,9 +93,10 @@ export let useConfigs = (
   }
 
   useEffect(() => {
-    loadConfigs()
-      .then(syncWithExistingProcesses)
-      .then(updateServiceStatus)
+    // Show configs immediately, then sync process state in background
+    loadConfigs().then(() => {
+      syncWithExistingProcesses().then(updateServiceStatus)
+    })
 
     // Set up periodic verification of port forwards
     let verificationInterval = setInterval(() => {

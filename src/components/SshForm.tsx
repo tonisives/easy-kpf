@@ -3,6 +3,7 @@ import { useSshTesting } from "../hooks/useSshTesting"
 type SshFormProps = {
   sshHost: string
   sshPort: string
+  defaultLocalInterface: string
   onSshHostChange: (host: string) => void
   onSshPortChange: (port: string) => void
 }
@@ -10,6 +11,7 @@ type SshFormProps = {
 export let SshForm = ({
   sshHost,
   sshPort,
+  defaultLocalInterface,
   onSshHostChange,
   onSshPortChange,
 }: SshFormProps) => {
@@ -55,6 +57,19 @@ export let SshForm = ({
           }
         />
         <small>Port mapping in format local:remote</small>
+      </div>
+
+      <div className="form-group">
+        <label>Local Interface (Optional):</label>
+        <input
+          type="text"
+          name="localInterface"
+          defaultValue={defaultLocalInterface}
+          placeholder="e.g., 127.0.0.2, 0.0.0.0"
+        />
+        <small>
+          Bind to specific interface (default: 127.0.0.1). Will create if doesn't exist.
+        </small>
       </div>
 
       <div className="form-group">

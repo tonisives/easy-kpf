@@ -21,17 +21,18 @@ impl ProcessManager {
   }
 
   pub fn with_state_file(state_file_path: PathBuf) -> Self {
-    let manager = Self {
+    Self {
       processes: Arc::new(Mutex::new(HashMap::new())),
       state_file_path: Some(state_file_path),
-    };
+    }
+  }
 
-    // Try to load existing state
-    if let Err(e) = manager.load_state() {
+  /// Load persisted process state from disk. Call this after the window is visible
+  /// to avoid blocking app startup (each saved process triggers a `ps` call).
+  pub fn restore_state(&self) {
+    if let Err(e) = self.load_state() {
       log::warn!("Failed to load process manager state: {}", e);
     }
-
-    manager
   }
 
   fn save_state(&self) -> Result<()> {

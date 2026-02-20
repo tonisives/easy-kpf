@@ -7,7 +7,7 @@ export type GroupedConfig = {
 
 export let groupConfigsByContext = (configs: PortForwardConfig[]): GroupedConfig[] => {
   let grouped = configs.reduce((acc, config) => {
-    let contextKey = config.forward_type === "Ssh" ? config.service : config.context
+    let contextKey = config.forward_type === "Ssh" ? "SSH" : config.context
 
     if (!acc[contextKey]) {
       acc[contextKey] = []

@@ -19,13 +19,36 @@ fn cleanup_all_port_forwards(port_forward_service: &PortForwardService) -> Resul
     .map_err(|e| e.to_string())
 }
 
+fn activate_and_show_window(app_handle: &tauri::AppHandle) {
+  if let Some(window) = app_handle.get_webview_window("main") {
+    let _ = window.show();
+    let _ = window.set_focus();
+  }
+  #[cfg(target_os = "macos")]
+  {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::NSApplication;
+    #[allow(unsafe_code)]
+    if let Some(mtm) = MainThreadMarker::new() {
+      let app = NSApplication::sharedApplication(mtm);
+      #[allow(deprecated)]
+      app.activateIgnoringOtherApps(true);
+    }
+  }
+}
+
+#[tauri::command]
+fn show_main_window(app_handle: tauri::AppHandle) {
+  activate_and_show_window(&app_handle);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   init_logging();
 
   let config_service = ConfigService::new().expect("Failed to initialize config service");
 
-  // Initialize ProcessManager with persistent state file
+  // Initialize ProcessManager without loading state yet (deferred to avoid blocking startup)
   let process_manager = {
     let state_path = dirs::config_dir()
       .expect("Could not find config directory")
@@ -37,8 +60,20 @@ pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_opener::init())
     .plugin(tauri_plugin_shell::init())
+    .on_window_event(|window, event| {
+      // When the user clicks the X button, hide the window instead of closing.
+      // Port forwards keep running. The app truly exits via Cmd+Q or dock quit.
+      if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        api.prevent_close();
+        let _ = window.hide();
+      }
+    })
     .setup(|app| {
       let app_handle = app.handle().clone();
+
+      // Show window immediately so the user sees the UI right away
+      activate_and_show_window(&app_handle);
+
       let kubectl_service = KubectlService::new(app_handle.clone(), config_service.clone());
       let port_forward_service =
         PortForwardService::new(app_handle, config_service.clone(), process_manager.clone());
@@ -46,7 +81,12 @@ pub fn run() {
       app.manage(config_service);
       app.manage(kubectl_service);
       app.manage(port_forward_service);
-      app.manage(process_manager);
+      app.manage(process_manager.clone());
+
+      // Restore process state in background
+      tauri::async_runtime::spawn_blocking(move || {
+        process_manager.restore_state();
+      });
 
       Ok(())
     })
@@ -76,14 +116,27 @@ pub fn run() {
       detect_kubectl_path,
       validate_kubectl_path,
       set_kubectl_path,
-      get_kubectl_path
+      get_kubectl_path,
+      show_main_window
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")
     .run(|app_handle, event| {
-      if let tauri::RunEvent::ExitRequested { .. } = event {
-        let port_forward_service = app_handle.state::<PortForwardService>();
-        let _ = cleanup_all_port_forwards(&port_forward_service);
+      match event {
+        tauri::RunEvent::ExitRequested { .. } => {
+          // Only clean up port forwards on actual app quit (Cmd+Q / dock quit)
+          let port_forward_service = app_handle.state::<PortForwardService>();
+          let _ = cleanup_all_port_forwards(&port_forward_service);
+        }
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Reopen { .. } => {
+          // Re-show the window when clicking the dock icon
+          if let Some(window) = app_handle.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+          }
+        }
+        _ => {}
       }
     });
 }

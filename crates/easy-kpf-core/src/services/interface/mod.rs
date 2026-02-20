@@ -23,10 +23,18 @@ pub struct SystemInterfaceManager;
 
 impl InterfaceManager for SystemInterfaceManager {
   fn ensure_interface_exists(&self, interface: &str) -> Result<()> {
+    // Strip port suffix if present (e.g., "127.0.0.2:5335" -> "127.0.0.2")
+    let ip = match interface.rsplit_once(':') {
+      Some((ip, port)) if port.parse::<u16>().is_ok() => ip,
+      _ => interface,
+    };
+
     // Skip for standard interfaces
-    if interface == "127.0.0.1" || interface == "0.0.0.0" || interface == "localhost" {
+    if ip == "127.0.0.1" || ip == "0.0.0.0" || ip == "localhost" {
       return Ok(());
     }
+
+    let interface = ip;
 
     #[cfg(target_os = "macos")]
     {

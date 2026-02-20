@@ -147,6 +147,7 @@ let AddConfigForm = ({
             <SshForm
               sshHost={sshHost}
               sshPort={sshPort}
+              defaultLocalInterface={defaultValues.localInterface}
               onSshHostChange={setSshHost}
               onSshPortChange={setSshPort}
             />
