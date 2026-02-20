@@ -83,7 +83,7 @@ pub fn run() {
       app.manage(port_forward_service);
       app.manage(process_manager.clone());
 
-      // Restore process state in background (involves ps calls per saved process)
+      // Restore process state in background
       tauri::async_runtime::spawn_blocking(move || {
         process_manager.restore_state();
       });

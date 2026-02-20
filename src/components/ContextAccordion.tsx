@@ -28,9 +28,8 @@ let ContextAccordion = ({
   let toggleExpanded = () => setIsExpanded(!isExpanded)
 
   let getContextDisplayName = (context: string, configs: PortForwardConfig[]) => {
-    let sshConfigs = configs.filter(config => config.forward_type === "Ssh")
-    if (sshConfigs.length > 0) {
-      return `SSH: ${context}`
+    if (configs.some(config => config.forward_type === "Ssh")) {
+      return "SSH"
     }
     return context
   }

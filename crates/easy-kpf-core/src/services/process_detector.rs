@@ -15,14 +15,7 @@ impl ProcessDetector {
     }
 
     let process_lines = self.get_process_list()?;
-
-    for line in process_lines.lines() {
-      if self.matches_kubectl_command(line, config) {
-        return Ok(true);
-      }
-    }
-
-    Ok(false)
+    Ok(self.find_matching_line(&process_lines, config).is_some())
   }
 
   pub fn find_kubectl_process_pid(&self, config: &PortForwardConfig) -> Result<Option<u32>> {
@@ -31,14 +24,44 @@ impl ProcessDetector {
     }
 
     let process_lines = self.get_process_list()?;
+    Ok(
+      self
+        .find_matching_line(&process_lines, config)
+        .and_then(|line| self.extract_pid_from_ps_line(line)),
+    )
+  }
 
-    for line in process_lines.lines() {
-      if self.matches_kubectl_command(line, config) {
-        return Ok(self.extract_pid_from_ps_line(line));
+  /// Detect all running kubectl/ssh processes matching configs in a single `ps aux` call.
+  /// Returns a vec of (config_name, pid) for each matched process.
+  pub fn detect_running_processes(
+    &self,
+    configs: &[PortForwardConfig],
+  ) -> Result<Vec<(String, u32)>> {
+    let process_lines = self.get_process_list()?;
+    let mut results = Vec::new();
+
+    for config in configs {
+      if config.forward_type != ForwardType::Kubectl {
+        continue;
+      }
+      if let Some(line) = self.find_matching_line(&process_lines, config) {
+        if let Some(pid) = self.extract_pid_from_ps_line(line) {
+          results.push((config.name.clone(), pid));
+        }
       }
     }
 
-    Ok(None)
+    Ok(results)
+  }
+
+  fn find_matching_line<'a>(
+    &self,
+    process_lines: &'a str,
+    config: &PortForwardConfig,
+  ) -> Option<&'a str> {
+    process_lines
+      .lines()
+      .find(|line| self.matches_kubectl_command(line, config))
   }
 
   pub fn is_process_actually_running(&self, pid: u32) -> Result<bool> {
@@ -125,20 +148,18 @@ impl ProcessDetector {
 
   #[cfg(target_os = "macos")]
   fn check_process_macos(&self, pid: u32) -> Result<bool> {
-    let output = Command::new("ps")
-      .args(["-p", &pid.to_string()])
-      .output()
-      .map_err(|e| AppError::System(format!("Failed to check process: {}", e)))?;
-    Ok(output.status.success())
+    // Use kill(pid, 0) to check if process exists without spawning a subprocess.
+    // Returns 0 if process exists (even if we can't signal it), -1 with ESRCH if not.
+    #[allow(unsafe_code)]
+    let ret = unsafe { libc::kill(pid as i32, 0) };
+    Ok(ret == 0)
   }
 
   #[cfg(target_os = "linux")]
   fn check_process_linux(&self, pid: u32) -> Result<bool> {
-    let output = Command::new("ps")
-      .args(["-p", &pid.to_string()])
-      .output()
-      .map_err(|e| AppError::System(format!("Failed to check process: {}", e)))?;
-    Ok(output.status.success())
+    #[allow(unsafe_code)]
+    let ret = unsafe { libc::kill(pid as i32, 0) };
+    Ok(ret == 0)
   }
 
   #[cfg(target_os = "windows")]

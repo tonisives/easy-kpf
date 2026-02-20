@@ -122,7 +122,12 @@ impl KubectlCommandBuilder {
 
     // Add --address flag if local interface is specified
     if let Some(ref interface) = config.local_interface {
-      args.extend_from_slice(&["--address".to_string(), interface.clone()]);
+      // Strip port suffix if present (e.g., "127.0.0.2:5335" -> "127.0.0.2")
+      let ip = match interface.rsplit_once(':') {
+        Some((ip, port)) if port.parse::<u16>().is_ok() => ip.to_string(),
+        _ => interface.clone(),
+      };
+      args.extend_from_slice(&["--address".to_string(), ip]);
     }
 
     // Add port mappings
@@ -195,29 +200,43 @@ impl SshPortMapper {
     ports: &[String],
     local_interface: Option<&str>,
   ) -> Vec<String> {
-    let bind_interface = local_interface.unwrap_or("127.0.0.1");
+    // Parse interface - may contain "ip:port" (e.g., "127.0.0.2:5335") or just "ip"
+    let (bind_ip, bind_port_override) = match local_interface {
+      Some(iface) => match iface.rsplit_once(':') {
+        Some((ip, port)) if port.parse::<u16>().is_ok() => (ip, Some(port)),
+        _ => (iface, None),
+      },
+      None => ("127.0.0.1", None),
+    };
 
     ports
       .iter()
-      .map(|port_mapping| self.format_port_mapping(port_mapping, bind_interface))
+      .map(|port_mapping| self.format_port_mapping(port_mapping, bind_ip, bind_port_override))
       .collect()
   }
 
-  fn format_port_mapping(&self, port_mapping: &str, bind_interface: &str) -> String {
+  fn format_port_mapping(
+    &self,
+    port_mapping: &str,
+    bind_ip: &str,
+    bind_port_override: Option<&str>,
+  ) -> String {
     let parts: Vec<&str> = port_mapping.split(':').collect();
 
     match parts.len() {
       1 => {
-        // Single port means same port for local and remote
-        format!("{}:{}:localhost:{}", bind_interface, parts[0], parts[0])
+        // Single port - use override as local port if present, otherwise same port
+        let local_port = bind_port_override.unwrap_or(parts[0]);
+        format!("{}:{}:localhost:{}", bind_ip, local_port, parts[0])
       }
       2 => {
-        // "local:remote" format
-        format!("{}:{}:localhost:{}", bind_interface, parts[0], parts[1])
+        // "local:remote" format - use override as local port if present
+        let local_port = bind_port_override.unwrap_or(parts[0]);
+        format!("{}:{}:localhost:{}", bind_ip, local_port, parts[1])
       }
       _ => {
         // Already in correct format or custom format
-        format!("{}:{}", bind_interface, port_mapping)
+        format!("{}:{}", bind_ip, port_mapping)
       }
     }
   }

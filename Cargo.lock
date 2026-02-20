@@ -917,6 +917,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "dirs 5.0.1",
+ "libc",
  "log",
  "serde",
  "serde_json",

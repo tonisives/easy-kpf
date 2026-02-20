@@ -361,13 +361,13 @@ impl PortForwardService {
 
   pub fn detect_existing_port_forwards(&self) -> Result<Vec<String>> {
     let configs = self.config_cache.get_configs()?;
+    // Single ps aux call to detect all running processes
+    let running = self.process_detector.detect_running_processes(&configs)?;
     let mut detected_services = Vec::new();
 
-    for config in &configs {
-      if self.process_detector.is_kubectl_process_running(config)?
-        && !self.process_manager.contains_process(&config.name)?
-      {
-        detected_services.push(config.name.clone());
+    for (name, _pid) in &running {
+      if !self.process_manager.contains_process(name)? {
+        detected_services.push(name.clone());
       }
     }
 
@@ -375,18 +375,18 @@ impl PortForwardService {
   }
 
   pub fn sync_with_existing_processes(&self) -> Result<Vec<String>> {
-    let detected = self.detect_existing_port_forwards()?;
+    let configs = self.config_cache.get_configs()?;
+    // Single ps aux call to detect all running processes
+    let running = self.process_detector.detect_running_processes(&configs)?;
     let mut synced_services = Vec::new();
 
-    for service_name in &detected {
-      let config = self.config_cache.find_config(service_name)?;
-      if let Some(config) = config {
-        if let Some(pid) = self.process_detector.find_kubectl_process_pid(&config)? {
-          // Add to process manager to track it
+    for (name, pid) in running {
+      if !self.process_manager.contains_process(&name)? {
+        if let Some(config) = configs.iter().find(|c| c.name == name) {
           self
             .process_manager
-            .add_process(service_name.clone(), pid, config)?;
-          synced_services.push(service_name.clone());
+            .add_process(name.clone(), pid, config.clone())?;
+          synced_services.push(name);
         }
       }
     }
