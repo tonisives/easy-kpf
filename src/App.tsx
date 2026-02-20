@@ -25,7 +25,7 @@ import { groupConfigsByContext } from "./utils/groupingUtils"
 
 function App() {
   let [message, setMessage] = useState("")
-  let [kubectlConfigured, setKubectlConfigured] = useState<boolean | null>(null)
+  let [kubectlConfigured, setKubectlConfigured] = useState<boolean | null>(true)
   let [showSettings, setShowSettings] = useState(false)
 
   let [showAddForm, setShowAddForm] = useState(false)
@@ -147,11 +147,7 @@ function App() {
     setActiveId(null)
   }
 
-  if (kubectlConfigured === null) {
-    return <div style={{ padding: "20px", textAlign: "center" }}>Loading...</div>
-  }
-
-  if (!kubectlConfigured || showSettings) {
+  if (kubectlConfigured === false || showSettings) {
     return <SetupScreen 
       onSetupComplete={() => {
         setKubectlConfigured(true)
