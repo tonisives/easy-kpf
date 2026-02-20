@@ -38,6 +38,7 @@ export let useFormState = ({ onAdd, onUpdate, onClose, editingConfig }: FormStat
     if (forwardType === "Ssh") {
       let sshHost = formData.get("sshHost") as string
       let sshPort = formData.get("sshPort") as string
+      let localInterface = formData.get("localInterface") as string
       let ports = [sshPort]
 
       let derivedName = providedName || deriveConfigName(forwardType, selectedService, sshHost, ports)
@@ -48,7 +49,7 @@ export let useFormState = ({ onAdd, onUpdate, onClose, editingConfig }: FormStat
         namespace: "default",
         service: sshHost,
         ports: ports,
-        local_interface: undefined,
+        local_interface: localInterface || undefined,
         forward_type: "Ssh",
       }
     } else {

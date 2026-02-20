@@ -13,13 +13,13 @@ name = "easy_kpf_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.5", features = [] }
 
 [dependencies]
 easy-kpf-core = { path = "../easy-kpf-core" }
-tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
-tauri-plugin-shell = "2"
+tauri = { version = "2.10", features = [] }
+tauri-plugin-opener = "2.5"
+tauri-plugin-shell = "2.3"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -27,4 +27,8 @@ dirs = "5.0"
 log = "0.4"
 env_logger = "0.10"
 async-trait = "0.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSRunningApplication"] }
 

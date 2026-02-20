@@ -13,6 +13,7 @@ const KUBECTL_DETECTION_PATHS: &[&str] = &[
 ];
 
 #[async_trait]
+#[allow(dead_code)]
 pub trait KubectlOperations {
   async fn get_namespaces(&self, context: &str) -> Result<Vec<String>>;
   async fn get_services(&self, context: &str, namespace: &str) -> Result<Vec<String>>;
