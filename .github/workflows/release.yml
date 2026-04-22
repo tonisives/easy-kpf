@@ -54,23 +54,29 @@ jobs:
         run: ./etc/update-version.sh "${{ github.ref_name }}"
 
       - name: Build CLI
-        run: cargo build --release --package easy-kpf-cli --target ${{ matrix.target }}
+        shell: bash
+        run: |
+          cargo build --release --package easy-kpf-cli --target ${{ matrix.target }}
+          if [ "${{ matrix.platform }}" != "windows-latest" ]; then
+            cargo build --release --package easy-kpf-kpfctl --target ${{ matrix.target }}
+          fi
 
       - name: Prepare artifact (Unix)
         if: matrix.platform != 'windows-latest'
         run: |
-          mkdir -p dist
-          cp target/${{ matrix.target }}/release/easykpf dist/${{ matrix.artifact_name }}
-          chmod +x dist/${{ matrix.artifact_name }}
+          mkdir -p dist/${{ matrix.artifact_name }}
+          cp target/${{ matrix.target }}/release/easykpf dist/${{ matrix.artifact_name }}/easykpf
+          cp target/${{ matrix.target }}/release/ekpfctl dist/${{ matrix.artifact_name }}/ekpfctl
+          chmod +x dist/${{ matrix.artifact_name }}/easykpf dist/${{ matrix.artifact_name }}/ekpfctl
           cd dist && tar -czvf ${{ matrix.artifact_name }}.tar.gz ${{ matrix.artifact_name }}
 
       - name: Prepare artifact (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist
-          Copy-Item "target/${{ matrix.target }}/release/easykpf.exe" "dist/${{ matrix.artifact_name }}.exe"
-          Compress-Archive -Path "dist/${{ matrix.artifact_name }}.exe" -DestinationPath "dist/${{ matrix.artifact_name }}.zip"
+          New-Item -ItemType Directory -Force -Path "dist/${{ matrix.artifact_name }}"
+          Copy-Item "target/${{ matrix.target }}/release/easykpf.exe" "dist/${{ matrix.artifact_name }}/easykpf.exe"
+          Compress-Archive -Path "dist/${{ matrix.artifact_name }}/*" -DestinationPath "dist/${{ matrix.artifact_name }}.zip"
 
       - name: Upload CLI artifact to release
         env:

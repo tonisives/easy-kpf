@@ -9,7 +9,7 @@ edition = "2021"
 workspace = true
 
 [[bin]]
-name = "kpfctl"
+name = "ekpfctl"
 path = "src/main.rs"
 
 [dependencies]

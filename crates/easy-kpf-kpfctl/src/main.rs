@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 use easy_kpf_core::ipc::protocol::Request;
 
 #[derive(Parser)]
-#[command(name = "kpfctl", about = "Control the EasyKpf desktop app")]
+#[command(name = "ekpfctl", about = "Control the EasyKpf desktop app")]
 struct Cli {
   #[command(subcommand)]
   command: Command,

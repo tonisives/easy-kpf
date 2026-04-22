@@ -1,11 +1,23 @@
+#[cfg(not(unix))]
+pub async fn spawn(_app_handle: tauri::AppHandle) {
+  log::info!("IPC server is not supported on this platform; skipping");
+}
+
+#[cfg(unix)]
 use easy_kpf_core::ipc::protocol::{Request, Response, ResponseData, ServiceStatus};
+#[cfg(unix)]
 use easy_kpf_core::ipc::socket_path::default_socket_path;
+#[cfg(unix)]
 use tauri::Manager;
+#[cfg(unix)]
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+#[cfg(unix)]
 use tokio::net::{UnixListener, UnixStream};
 
+#[cfg(unix)]
 use crate::services::{KubectlService, PortForwardService};
 
+#[cfg(unix)]
 pub async fn spawn(app_handle: tauri::AppHandle) {
   let socket_path = default_socket_path();
 
@@ -55,6 +67,7 @@ pub async fn spawn(app_handle: tauri::AppHandle) {
   }
 }
 
+#[cfg(unix)]
 async fn handle_connection(
   stream: UnixStream,
   app_handle: tauri::AppHandle,
@@ -79,6 +92,7 @@ async fn handle_connection(
   Ok(())
 }
 
+#[cfg(unix)]
 async fn dispatch(request: Request, app_handle: &tauri::AppHandle) -> Response {
   let pf = app_handle.state::<PortForwardService>();
   let kc = app_handle.state::<KubectlService>();
