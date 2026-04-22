@@ -87,44 +87,67 @@ async fn dispatch(request: Request, app_handle: &tauri::AppHandle) -> Response {
     Request::List | Request::Status => {
       let configs = match pf.get_configs() {
         Ok(c) => c,
-        Err(e) => return Response::Err { message: e.to_string() },
+        Err(e) => {
+          return Response::Err {
+            message: e.to_string(),
+          }
+        }
       };
       let running = match pf.get_running_services() {
         Ok(r) => r,
-        Err(e) => return Response::Err { message: e.to_string() },
+        Err(e) => {
+          return Response::Err {
+            message: e.to_string(),
+          }
+        }
       };
       let statuses = configs
         .into_iter()
         .map(|c| {
           let running = running.contains(&c.name);
-          ServiceStatus { name: c.name, running }
+          ServiceStatus {
+            name: c.name,
+            running,
+          }
         })
         .collect();
-      Response::Ok { data: ResponseData::Services(statuses) }
-    }
-
-    Request::Start { name } => {
-      match pf.start_port_forward_by_key(kc.inner(), &name).await {
-        Ok(msg) => Response::Ok { data: ResponseData::Text(msg) },
-        Err(e) => Response::Err { message: e.to_string() },
+      Response::Ok {
+        data: ResponseData::Services(statuses),
       }
     }
 
-    Request::Stop { name } => match pf.stop_port_forward(&name) {
-      Ok(msg) => Response::Ok { data: ResponseData::Text(msg) },
-      Err(e) => Response::Err { message: e.to_string() },
+    Request::Start { name } => match pf.start_port_forward_by_key(kc.inner(), &name).await {
+      Ok(msg) => Response::Ok {
+        data: ResponseData::Text(msg),
+      },
+      Err(e) => Response::Err {
+        message: e.to_string(),
+      },
     },
 
-    Request::ReconnectAll => {
-      match crate::reconnect::reconnect_all(pf.inner(), kc.inner()).await {
-        Ok(names) => Response::Ok { data: ResponseData::Reconnected(names) },
-        Err(e) => Response::Err { message: e.to_string() },
-      }
-    }
+    Request::Stop { name } => match pf.stop_port_forward(&name) {
+      Ok(msg) => Response::Ok {
+        data: ResponseData::Text(msg),
+      },
+      Err(e) => Response::Err {
+        message: e.to_string(),
+      },
+    },
+
+    Request::ReconnectAll => match crate::reconnect::reconnect_all(pf.inner(), kc.inner()).await {
+      Ok(names) => Response::Ok {
+        data: ResponseData::Reconnected(names),
+      },
+      Err(e) => Response::Err {
+        message: e.to_string(),
+      },
+    },
 
     Request::Show => {
       crate::window::activate_and_show_window(app_handle);
-      Response::Ok { data: ResponseData::Empty }
+      Response::Ok {
+        data: ResponseData::Empty,
+      }
     }
   }
 }

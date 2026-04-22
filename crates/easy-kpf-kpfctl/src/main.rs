@@ -15,13 +15,9 @@ enum Command {
   #[command(about = "Start all stopped port forwards")]
   ReconnectAll,
   #[command(about = "Start a port forward by config name")]
-  Start {
-    name: String,
-  },
+  Start { name: String },
   #[command(about = "Stop a port forward by config name")]
-  Stop {
-    name: String,
-  },
+  Stop { name: String },
   #[command(about = "List all configured port forwards and their state")]
   List,
   #[command(about = "Show status of all port forwards")]

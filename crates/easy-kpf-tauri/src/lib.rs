@@ -56,8 +56,11 @@ pub fn run() {
       window::activate_and_show_window(&app_handle);
 
       let kubectl_service = KubectlService::new(app_handle.clone(), config_service.clone());
-      let port_forward_service =
-        PortForwardService::new(app_handle.clone(), config_service.clone(), process_manager.clone());
+      let port_forward_service = PortForwardService::new(
+        app_handle.clone(),
+        config_service.clone(),
+        process_manager.clone(),
+      );
 
       app.manage(config_service);
       app.manage(kubectl_service);
@@ -105,21 +108,19 @@ pub fn run() {
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")
-    .run(|app_handle, event| {
-      match event {
-        tauri::RunEvent::ExitRequested { .. } => {
-          let port_forward_service = app_handle.state::<PortForwardService>();
-          let _ = cleanup_all_port_forwards(&port_forward_service);
-          let _ = std::fs::remove_file(default_socket_path());
-        }
-        #[cfg(target_os = "macos")]
-        tauri::RunEvent::Reopen { .. } => {
-          if let Some(window) = app_handle.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.set_focus();
-          }
-        }
-        _ => {}
+    .run(|app_handle, event| match event {
+      tauri::RunEvent::ExitRequested { .. } => {
+        let port_forward_service = app_handle.state::<PortForwardService>();
+        let _ = cleanup_all_port_forwards(&port_forward_service);
+        let _ = std::fs::remove_file(default_socket_path());
       }
+      #[cfg(target_os = "macos")]
+      tauri::RunEvent::Reopen { .. } => {
+        if let Some(window) = app_handle.get_webview_window("main") {
+          let _ = window.show();
+          let _ = window.set_focus();
+        }
+      }
+      _ => {}
     });
 }
