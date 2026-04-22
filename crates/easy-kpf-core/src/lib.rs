@@ -1,4 +1,5 @@
 pub mod error;
+pub mod ipc;
 pub mod services;
 pub mod traits;
 pub mod types;
