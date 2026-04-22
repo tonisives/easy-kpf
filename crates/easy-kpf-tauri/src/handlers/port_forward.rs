@@ -1,3 +1,4 @@
+use crate::reconnect;
 use crate::services::{KubectlService, PortForwardService};
 use easy_kpf_core::types::PortForwardConfig;
 use tauri::State;
@@ -117,6 +118,16 @@ pub fn sync_with_existing_processes(
 ) -> Result<Vec<String>, String> {
   port_forward_service
     .sync_with_existing_processes()
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn reconnect_all_services(
+  port_forward_service: State<'_, PortForwardService>,
+  kubectl_service: State<'_, KubectlService>,
+) -> Result<Vec<String>, String> {
+  reconnect::reconnect_all(port_forward_service.inner(), kubectl_service.inner())
+    .await
     .map_err(|e| e.to_string())
 }
 

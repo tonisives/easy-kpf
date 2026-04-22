@@ -3,6 +3,7 @@ members = [
     "crates/easy-kpf-core",
     "crates/easy-kpf-cli",
     "crates/easy-kpf-tauri",
+    "crates/easy-kpf-kpfctl",
 ]
 resolver = "2"
 

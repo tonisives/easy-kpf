@@ -304,18 +304,7 @@ export let useConfigs = (
   }
 
   let reconnectAll = async () => {
-    let disconnectedServices = services.filter((service) => {
-      let config = configs.find((c) => c.name === service.name)
-      return config && !service.running && service.errors && service.errors.length > 0
-    })
-
-    if (disconnectedServices.length === 0) {
-      return
-    }
-
-    for (let service of disconnectedServices) {
-      await startPortForward(service.name)
-    }
+    await invoke("reconnect_all_services")
   }
 
   return {
