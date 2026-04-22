@@ -61,10 +61,8 @@ pub fn handle_edit_mode(app: &mut App, key: KeyEvent) -> Result<()> {
       app.autocomplete_prev();
     }
     // Enter accepts current suggestion
-    KeyCode::Enter => {
-      if !app.get_autocomplete_suggestions().is_empty() {
-        app.accept_autocomplete();
-      }
+    KeyCode::Enter if !app.get_autocomplete_suggestions().is_empty() => {
+      app.accept_autocomplete();
     }
     // Ctrl+s to save
     KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -135,10 +133,8 @@ fn handle_typing_mode(app: &mut App, key: KeyEvent) -> Result<()> {
       app.load_autocomplete();
     }
     // Enter accepts current suggestion
-    KeyCode::Enter => {
-      if !app.get_autocomplete_suggestions().is_empty() {
-        app.accept_autocomplete();
-      }
+    KeyCode::Enter if !app.get_autocomplete_suggestions().is_empty() => {
+      app.accept_autocomplete();
     }
     // : at start of empty field or Ctrl+: enters command mode
     KeyCode::Char(':') if key.modifiers.contains(KeyModifiers::CONTROL) => {

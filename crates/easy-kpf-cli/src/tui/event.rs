@@ -23,26 +23,20 @@ impl EventHandler {
     std::thread::spawn(move || {
       loop {
         if event::poll(tick_rate).unwrap_or(false) {
-          match event::read() {
-            Ok(CrosstermEvent::Key(key)) => {
-              // Only handle key press events (not release)
-              if key.kind == KeyEventKind::Press && event_tx.blocking_send(Event::Key(key)).is_err()
-              {
-                break;
-              }
+          let send_result = match event::read() {
+            // Only handle key press events (not release)
+            Ok(CrosstermEvent::Key(key)) if key.kind == KeyEventKind::Press => {
+              event_tx.blocking_send(Event::Key(key))
             }
-            Ok(CrosstermEvent::Resize(w, h)) => {
-              if event_tx.blocking_send(Event::Resize(w, h)).is_err() {
-                break;
-              }
-            }
-            _ => {}
-          }
-        } else {
-          // Tick event for periodic updates
-          if event_tx.blocking_send(Event::Tick).is_err() {
+            Ok(CrosstermEvent::Resize(w, h)) => event_tx.blocking_send(Event::Resize(w, h)),
+            _ => Ok(()),
+          };
+          if send_result.is_err() {
             break;
           }
+        } else if event_tx.blocking_send(Event::Tick).is_err() {
+          // Tick event for periodic updates
+          break;
         }
       }
     });

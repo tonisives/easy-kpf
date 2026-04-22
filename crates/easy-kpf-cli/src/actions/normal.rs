@@ -14,26 +14,22 @@ pub async fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<()> {
     }
 
     // Navigation
-    KeyCode::Char('j') | KeyCode::Down | KeyCode::Char('.') => {
-      if app.active_panel == Panel::ServiceList {
-        app.move_selection(1);
-      }
+    KeyCode::Char('j') | KeyCode::Down | KeyCode::Char('.')
+      if app.active_panel == Panel::ServiceList =>
+    {
+      app.move_selection(1);
     }
-    KeyCode::Char('k') | KeyCode::Up | KeyCode::Char(',') => {
-      if app.active_panel == Panel::ServiceList {
-        app.move_selection(-1);
-      }
+    KeyCode::Char('k') | KeyCode::Up | KeyCode::Char(',')
+      if app.active_panel == Panel::ServiceList =>
+    {
+      app.move_selection(-1);
     }
     // Jump to start/end
-    KeyCode::Char('<') => {
-      if app.active_panel == Panel::ServiceList {
-        app.select_first();
-      }
+    KeyCode::Char('<') if app.active_panel == Panel::ServiceList => {
+      app.select_first();
     }
-    KeyCode::Char('>') => {
-      if app.active_panel == Panel::ServiceList {
-        app.select_last();
-      }
+    KeyCode::Char('>') if app.active_panel == Panel::ServiceList => {
+      app.select_last();
     }
     KeyCode::Char('h') | KeyCode::Left => {
       app.active_panel = Panel::ServiceList;
@@ -43,30 +39,27 @@ pub async fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<()> {
     }
 
     // Toggle port forward
-    KeyCode::Char(' ') | KeyCode::Enter => {
-      if app.active_panel == Panel::ServiceList {
-        toggle_selected(app).await?;
-      }
+    KeyCode::Char(' ') | KeyCode::Enter if app.active_panel == Panel::ServiceList => {
+      toggle_selected(app).await?;
     }
 
     // Enter visual mode
-    KeyCode::Char('v') => {
-      if app.active_panel == Panel::ServiceList && !app.visual_order.is_empty() {
-        app.enter_visual_mode();
-      }
+    KeyCode::Char('v')
+      if app.active_panel == Panel::ServiceList && !app.visual_order.is_empty() =>
+    {
+      app.enter_visual_mode();
     }
 
     // Toggle all - show confirmation
-    KeyCode::Char('a') => {
-      if app.running_services.is_empty() && !app.configs.is_empty() {
-        // Starting all - show confirmation
-        app.confirm_action = Some(ConfirmAction::StartAll);
-        app.mode = Mode::Confirm;
-      } else if !app.running_services.is_empty() {
-        // Stopping all - show confirmation
-        app.confirm_action = Some(ConfirmAction::StopAll);
-        app.mode = Mode::Confirm;
-      }
+    KeyCode::Char('a') if app.running_services.is_empty() && !app.configs.is_empty() => {
+      // Starting all - show confirmation
+      app.confirm_action = Some(ConfirmAction::StartAll);
+      app.mode = Mode::Confirm;
+    }
+    KeyCode::Char('a') if !app.running_services.is_empty() => {
+      // Stopping all - show confirmation
+      app.confirm_action = Some(ConfirmAction::StopAll);
+      app.mode = Mode::Confirm;
     }
 
     // New config
