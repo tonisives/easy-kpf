@@ -6,8 +6,8 @@ pub mod types;
 
 pub use error::{AppError, Result};
 pub use services::{
-  ConfigCache, ConfigService, InterfaceManager, KubectlCommandBuilder, ProcessDetector,
-  ProcessManager, SshCommandBuilder, SystemInterfaceManager,
+  ConfigCache, ConfigService, InterfaceManager, KubectlCommandBuilder, LastActiveSet,
+  ProcessDetector, ProcessManager, SshCommandBuilder, SystemInterfaceManager,
 };
 pub use traits::{CommandExecutor, ProcessEvent, ProcessHandle, ProcessOutput};
 pub use types::{

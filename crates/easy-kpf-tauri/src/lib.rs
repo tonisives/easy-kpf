@@ -11,7 +11,7 @@ pub use easy_kpf_core::error;
 pub use easy_kpf_core::types;
 
 use easy_kpf_core::ipc::socket_path::default_socket_path;
-use easy_kpf_core::{ConfigService, ProcessManager};
+use easy_kpf_core::{ConfigService, LastActiveSet, ProcessManager};
 use handlers::*;
 use services::{KubectlService, PortForwardService};
 use utils::init_logging;
@@ -33,13 +33,12 @@ pub fn run() {
 
   let config_service = ConfigService::new().expect("Failed to initialize config service");
 
-  let process_manager = {
-    let state_path = dirs::config_dir()
-      .expect("Could not find config directory")
-      .join("EasyKpf")
-      .join("process-state.json");
-    ProcessManager::with_state_file(state_path)
-  };
+  let config_dir = dirs::config_dir()
+    .expect("Could not find config directory")
+    .join("EasyKpf");
+
+  let process_manager = ProcessManager::with_state_file(config_dir.join("process-state.json"));
+  let last_active = LastActiveSet::with_file(config_dir.join("last-active.json"));
 
   tauri::Builder::default()
     .plugin(tauri_plugin_opener::init())
@@ -60,12 +59,14 @@ pub fn run() {
         app_handle.clone(),
         config_service.clone(),
         process_manager.clone(),
+        last_active.clone(),
       );
 
       app.manage(config_service);
       app.manage(kubectl_service);
       app.manage(port_forward_service);
       app.manage(process_manager.clone());
+      app.manage(last_active);
 
       tauri::async_runtime::spawn_blocking(move || {
         process_manager.restore_state();

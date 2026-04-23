@@ -1,7 +1,9 @@
 mod client;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::{generate, Shell};
 use easy_kpf_core::ipc::protocol::Request;
+use std::io;
 
 #[derive(Parser)]
 #[command(name = "ekpfctl", about = "Control the EasyKpf desktop app")]
@@ -12,7 +14,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-  #[command(about = "Start all stopped port forwards")]
+  #[command(about = "Start services from the last-active set that aren't running")]
   ReconnectAll,
   #[command(about = "Start a port forward by config name")]
   Start { name: String },
@@ -24,6 +26,11 @@ enum Command {
   Status,
   #[command(about = "Bring the EasyKpf window to focus")]
   Show,
+  #[command(about = "Print shell completion script to stdout")]
+  Completions {
+    #[arg(value_enum)]
+    shell: Shell,
+  },
 }
 
 #[tokio::main]
@@ -37,6 +44,12 @@ async fn main() {
     Command::List => Request::List,
     Command::Status => Request::Status,
     Command::Show => Request::Show,
+    Command::Completions { shell } => {
+      let mut cmd = Cli::command();
+      let bin_name = cmd.get_name().to_string();
+      generate(shell, &mut cmd, bin_name, &mut io::stdout());
+      return;
+    }
   };
 
   client::send(request).await;

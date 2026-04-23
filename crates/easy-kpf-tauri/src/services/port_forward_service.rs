@@ -1,7 +1,7 @@
 use easy_kpf_core::error::{AppError, Result};
 use easy_kpf_core::services::{
-  ConfigCache, ConfigService, InterfaceManager, KubectlCommandBuilder, ProcessDetector,
-  ProcessManager, SshCommandBuilder, SystemInterfaceManager,
+  ConfigCache, ConfigService, InterfaceManager, KubectlCommandBuilder, LastActiveSet,
+  ProcessDetector, ProcessManager, SshCommandBuilder, SystemInterfaceManager,
 };
 use easy_kpf_core::types::{ForwardType, PortForwardConfig};
 use serde::Serialize;
@@ -21,6 +21,7 @@ pub struct PortForwardService {
   config_cache: ConfigCache,
   config_service: ConfigService,
   process_manager: ProcessManager,
+  last_active: LastActiveSet,
   interface_manager: SystemInterfaceManager,
   process_detector: ProcessDetector,
 }
@@ -30,15 +31,21 @@ impl PortForwardService {
     app_handle: tauri::AppHandle,
     config_service: ConfigService,
     process_manager: ProcessManager,
+    last_active: LastActiveSet,
   ) -> Self {
     Self {
       app_handle,
       config_cache: ConfigCache::new(config_service.clone()),
       config_service,
       process_manager,
+      last_active,
       interface_manager: SystemInterfaceManager,
       process_detector: ProcessDetector::new(),
     }
+  }
+
+  pub fn last_active(&self) -> &LastActiveSet {
+    &self.last_active
   }
 
   pub fn get_configs(&self) -> Result<Vec<PortForwardConfig>> {
@@ -50,6 +57,7 @@ impl PortForwardService {
   }
 
   pub fn remove_config(&self, service_key: &str) -> Result<()> {
+    self.last_active.remove(service_key)?;
     self.config_cache.remove_config(service_key)
   }
 
@@ -59,6 +67,7 @@ impl PortForwardService {
       self
         .process_manager
         .update_process_name(old_service_key, new_config.name.clone())?;
+      self.last_active.rename(old_service_key, &new_config.name)?;
     }
 
     self.config_cache.update_config(old_service_key, new_config)
@@ -153,6 +162,7 @@ impl PortForwardService {
     self
       .process_manager
       .add_process(config.name.clone(), pid, config.clone())?;
+    self.last_active.add(&config.name)?;
 
     // Monitor process output in background
     let service_name = config.name.clone();
@@ -236,6 +246,7 @@ impl PortForwardService {
     self
       .process_manager
       .add_process(config.name.clone(), pid, config.clone())?;
+    self.last_active.add(&config.name)?;
 
     // Monitor process output in background
     let service_name = config.name.clone();
@@ -298,6 +309,8 @@ impl PortForwardService {
       .ok_or_else(|| {
         AppError::NotFound(format!("{} port forwarding is not running", service_name))
       })?;
+
+    self.last_active.remove(service_name)?;
 
     log::info!("[{}] Stopping port forward (PID: {})", service_name, pid);
 
