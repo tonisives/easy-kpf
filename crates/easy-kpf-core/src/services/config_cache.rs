@@ -1,6 +1,6 @@
 use crate::error::{AppError, Result};
 use crate::services::ConfigService;
-use crate::types::PortForwardConfig;
+use crate::types::{ForwardType, PortForwardConfig};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -134,6 +134,12 @@ impl ConfigCache {
     self.update_configs(configs)
   }
 
+  pub fn reorder_group(&self, group_key: &str, new_index: usize) -> Result<()> {
+    let configs = self.get_configs()?;
+    let configs = reorder_group_configs(configs, group_key, new_index)?;
+    self.update_configs(configs)
+  }
+
   /// Get cached configs if valid, None otherwise
   fn get_valid_cache(&self, cache_data: &CacheData) -> Option<Vec<PortForwardConfig>> {
     let configs = cache_data.configs.as_ref()?;
@@ -144,5 +150,100 @@ impl ConfigCache {
     } else {
       None
     }
+  }
+}
+
+fn config_group_key(config: &PortForwardConfig) -> &str {
+  match &config.forward_type {
+    ForwardType::Ssh => "SSH",
+    ForwardType::Kubectl => &config.context,
+  }
+}
+
+fn reorder_group_configs(
+  configs: Vec<PortForwardConfig>,
+  group_key: &str,
+  new_index: usize,
+) -> Result<Vec<PortForwardConfig>> {
+  let mut groups: Vec<(String, Vec<PortForwardConfig>)> = Vec::new();
+
+  for config in configs {
+    let key = config_group_key(&config).to_string();
+    if let Some((_, group_configs)) = groups.iter_mut().find(|(group, _)| group == &key) {
+      group_configs.push(config);
+    } else {
+      groups.push((key, vec![config]));
+    }
+  }
+
+  let current_index = groups
+    .iter()
+    .position(|(group, _)| group == group_key)
+    .ok_or_else(|| AppError::NotFound(format!("Configuration group not found: {}", group_key)))?;
+
+  if new_index >= groups.len() {
+    return Err(AppError::InvalidInput("Invalid group index".to_string()));
+  }
+
+  let group = groups.remove(current_index);
+  groups.insert(new_index, group);
+
+  Ok(
+    groups
+      .into_iter()
+      .flat_map(|(_, group_configs)| group_configs)
+      .collect(),
+  )
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn config(name: &str, context: &str, forward_type: ForwardType) -> PortForwardConfig {
+    PortForwardConfig {
+      name: name.to_string(),
+      context: context.to_string(),
+      namespace: "default".to_string(),
+      service: name.to_string(),
+      ports: vec!["8080:80".to_string()],
+      local_interface: None,
+      forward_type,
+    }
+  }
+
+  #[test]
+  fn reorders_context_groups_without_changing_service_order() {
+    let configs = vec![
+      config("a-1", "a", ForwardType::Kubectl),
+      config("a-2", "a", ForwardType::Kubectl),
+      config("b-1", "b", ForwardType::Kubectl),
+      config("c-1", "c", ForwardType::Kubectl),
+    ];
+
+    let reordered = reorder_group_configs(configs, "c", 0).unwrap();
+    let names: Vec<&str> = reordered
+      .iter()
+      .map(|config| config.name.as_str())
+      .collect();
+
+    assert_eq!(names, vec!["c-1", "a-1", "a-2", "b-1"]);
+  }
+
+  #[test]
+  fn treats_ssh_configs_as_one_group() {
+    let configs = vec![
+      config("kube", "cluster", ForwardType::Kubectl),
+      config("ssh-1", "ignored-1", ForwardType::Ssh),
+      config("ssh-2", "ignored-2", ForwardType::Ssh),
+    ];
+
+    let reordered = reorder_group_configs(configs, "SSH", 0).unwrap();
+    let names: Vec<&str> = reordered
+      .iter()
+      .map(|config| config.name.as_str())
+      .collect();
+
+    assert_eq!(names, vec!["ssh-1", "ssh-2", "kube"]);
   }
 }

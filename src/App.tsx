@@ -12,7 +12,9 @@ import {
   DragStartEvent,
 } from "@dnd-kit/core"
 import {
+  SortableContext,
   sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import ServiceCard from "./ServiceCard"
 import ServiceSettings from "./components/ServiceSettings"
@@ -21,7 +23,27 @@ import SetupScreen from "./components/SetupScreen"
 import ContextAccordion from "./components/ContextAccordion"
 import "./App.css"
 import { PortForwardConfig, useConfigs } from "./hooks/hooks"
-import { groupConfigsByContext } from "./utils/groupingUtils"
+import { getConfigGroupKey, groupConfigsByContext } from "./utils/groupingUtils"
+
+const COLLAPSED_GROUPS_STORAGE_KEY = "easy-kpf.collapsed-groups"
+
+let loadCollapsedGroups = () => {
+  try {
+    let stored = localStorage.getItem(COLLAPSED_GROUPS_STORAGE_KEY)
+    let parsed = stored ? JSON.parse(stored) : []
+    return new Set<string>(Array.isArray(parsed) ? parsed : [])
+  } catch {
+    return new Set<string>()
+  }
+}
+
+let saveCollapsedGroups = (groups: Set<string>) => {
+  try {
+    localStorage.setItem(COLLAPSED_GROUPS_STORAGE_KEY, JSON.stringify([...groups]))
+  } catch {
+    // Keep the in-memory state when storage is unavailable.
+  }
+}
 
 function App() {
   let [message, setMessage] = useState("")
@@ -36,6 +58,7 @@ function App() {
     index: number
   } | null>(null)
   let [activeId, setActiveId] = useState<string | null>(null)
+  let [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(loadCollapsedGroups)
   let [searchQuery, setSearchQuery] = useState("")
   let [searchFocused, setSearchFocused] = useState(false)
   let searchInputRef = useRef<HTMLInputElement>(null)
@@ -49,6 +72,7 @@ function App() {
     removeConfig,
     updateConfig,
     reorderConfig,
+    reorderGroup,
     stopPortForward,
     clearServiceError,
     clearFormError,
@@ -117,6 +141,21 @@ function App() {
     )
   }, [configs, searchQuery])
 
+  let groupedConfigs = useMemo(() => groupConfigsByContext(filteredConfigs), [filteredConfigs])
+
+  let toggleGroup = (groupKey: string) => {
+    setCollapsedGroups((previous) => {
+      let next = new Set(previous)
+      if (next.has(groupKey)) {
+        next.delete(groupKey)
+      } else {
+        next.add(groupKey)
+      }
+      saveCollapsedGroups(next)
+      return next
+    })
+  }
+
   let sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -131,7 +170,23 @@ function App() {
   let handleDragEnd = (event: DragEndEvent) => {
     let { active, over } = event
 
-    if (active.id !== over?.id) {
+    if (active.data.current?.type === "group") {
+      let groupKey = active.data.current.groupKey as string
+      let overGroupKey = over?.data.current?.type === "group"
+        ? over.data.current.groupKey as string
+        : (() => {
+            let overConfig = configs.find((config) => config.name === over?.id)
+            return overConfig ? getConfigGroupKey(overConfig) : undefined
+          })()
+      let oldIndex = groupedConfigs.findIndex((group) => group.context === groupKey)
+      let newIndex = groupedConfigs.findIndex((group) => group.context === overGroupKey)
+
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+        reorderGroup(groupKey, newIndex).catch((error: any) => {
+          console.error("Group reorder failed:", error)
+        })
+      }
+    } else if (active.id !== over?.id) {
       let oldIndex = configs.findIndex((config) => config.name === active.id)
       let newIndex = configs.findIndex((config) => config.name === over?.id)
 
@@ -226,22 +281,42 @@ function App() {
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveId(null)}
         >
-          {groupConfigsByContext(filteredConfigs).map((group) => (
-            <ContextAccordion
-              key={group.context}
-              group={group}
-              services={services}
-              loading={loading}
-              onStart={startPortForward}
-              onStop={stopPortForward}
-              onSettings={setActiveServiceSettings}
-              onClearError={clearServiceError}
-            />
-          ))}
+          <SortableContext
+            items={groupedConfigs.map((group) => `group:${group.context}`)}
+            strategy={verticalListSortingStrategy}
+          >
+            {groupedConfigs.map((group) => (
+              <ContextAccordion
+                key={group.context}
+                group={group}
+                services={services}
+                loading={loading}
+                onStart={startPortForward}
+                onStop={stopPortForward}
+                onSettings={setActiveServiceSettings}
+                onClearError={clearServiceError}
+                isExpanded={!collapsedGroups.has(group.context)}
+                onToggle={() => toggleGroup(group.context)}
+                dragDisabled={Boolean(searchQuery.trim())}
+              />
+            ))}
+          </SortableContext>
           <DragOverlay>
             {activeId
               ? (() => {
+                  if (activeId.startsWith("group:")) {
+                    let group = groupedConfigs.find(
+                      (candidate) => `group:${candidate.context}` === activeId,
+                    )
+                    return group ? (
+                      <div className="group-drag-overlay">
+                        {group.context} ({group.configs.length} services)
+                      </div>
+                    ) : null
+                  }
+
                   let config = configs.find((c) => c.name === activeId)
                   let service = services.find((s) => s.name === activeId)
 

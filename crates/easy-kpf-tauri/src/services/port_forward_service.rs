@@ -14,6 +14,7 @@ use tauri_plugin_shell::ShellExt;
 pub struct ServiceErrorEvent {
   pub service_name: String,
   pub error: String,
+  pub fatal: bool,
 }
 
 pub struct PortForwardService {
@@ -77,6 +78,10 @@ impl PortForwardService {
     self.config_cache.reorder_config(service_key, new_index)
   }
 
+  pub fn reorder_group(&self, group_key: &str, new_index: usize) -> Result<()> {
+    self.config_cache.reorder_group(group_key, new_index)
+  }
+
   pub async fn start_port_forward_by_key<K: KubectlOperations>(
     &self,
     kubectl_service: &K,
@@ -99,6 +104,7 @@ impl PortForwardService {
     _kubectl_service: &K,
     config: PortForwardConfig,
   ) -> Result<String> {
+    self.verify_port_forwards()?;
     // Check if already running
     if self.process_manager.contains_process(&config.name)? {
       return Err(AppError::PortForward(format!(
@@ -167,9 +173,11 @@ impl PortForwardService {
     // Monitor process output in background
     let service_name = config.name.clone();
     let app_handle = self.app_handle.clone();
+    let process_manager = self.process_manager.clone();
     tauri::async_runtime::spawn(async move {
       use tauri_plugin_shell::process::CommandEvent;
       let mut rx = rx;
+      let mut unhealthy = false;
       while let Some(event) = rx.recv().await {
         match event {
           CommandEvent::Stdout(line) => {
@@ -178,34 +186,60 @@ impl PortForwardService {
           CommandEvent::Stderr(line) => {
             let error_text = String::from_utf8_lossy(&line).to_string();
             log::error!("[{}] {}", service_name, error_text);
+            let fatal = is_fatal_forward_error(&error_text);
+            if !unhealthy && fatal {
+              unhealthy = true;
+              let _ = process_manager.remove_process(&service_name);
+              let _ = ProcessManager::kill_process(pid);
+            }
             // Emit error event to frontend
             let _ = app_handle.emit(
               "service-error",
               ServiceErrorEvent {
                 service_name: service_name.clone(),
                 error: error_text,
+                fatal,
               },
             );
           }
           CommandEvent::Error(err) => {
             log::error!("[{}] Process error: {}", service_name, err);
+            if !unhealthy {
+              unhealthy = true;
+              let _ = process_manager.remove_process(&service_name);
+              let _ = ProcessManager::kill_process(pid);
+            }
             // Emit error event to frontend
             let _ = app_handle.emit(
               "service-error",
               ServiceErrorEvent {
                 service_name: service_name.clone(),
                 error: format!("Process error: {}", err),
+                fatal: true,
               },
             );
           }
           CommandEvent::Terminated(payload) => {
             log::warn!(
-              "[{}] Process terminated with code: {:?}. Will be cleaned up by verification cycle.",
+              "[{}] Process terminated with code: {:?}.",
               service_name,
               payload.code
             );
-            // Don't remove here - let verify_port_forwards() handle cleanup
-            // so the frontend gets properly notified via verify_and_update_port_forwards
+            let was_managed = process_manager
+              .remove_process(&service_name)
+              .ok()
+              .flatten()
+              .is_some();
+            if was_managed {
+              let _ = app_handle.emit(
+                "service-error",
+                ServiceErrorEvent {
+                  service_name: service_name.clone(),
+                  error: "Port forward stopped unexpectedly".to_string(),
+                  fatal: true,
+                },
+              );
+            }
           }
           _ => {}
         }
@@ -251,9 +285,11 @@ impl PortForwardService {
     // Monitor process output in background
     let service_name = config.name.clone();
     let app_handle = self.app_handle.clone();
+    let process_manager = self.process_manager.clone();
     tauri::async_runtime::spawn(async move {
       use tauri_plugin_shell::process::CommandEvent;
       let mut rx = rx;
+      let mut unhealthy = false;
       while let Some(event) = rx.recv().await {
         match event {
           CommandEvent::Stdout(line) => {
@@ -262,34 +298,60 @@ impl PortForwardService {
           CommandEvent::Stderr(line) => {
             let error_text = String::from_utf8_lossy(&line).to_string();
             log::error!("[{}] {}", service_name, error_text);
+            let fatal = is_fatal_forward_error(&error_text);
+            if !unhealthy && fatal {
+              unhealthy = true;
+              let _ = process_manager.remove_process(&service_name);
+              let _ = ProcessManager::kill_process(pid);
+            }
             // Emit error event to frontend
             let _ = app_handle.emit(
               "service-error",
               ServiceErrorEvent {
                 service_name: service_name.clone(),
                 error: error_text,
+                fatal,
               },
             );
           }
           CommandEvent::Error(err) => {
             log::error!("[{}] Process error: {}", service_name, err);
+            if !unhealthy {
+              unhealthy = true;
+              let _ = process_manager.remove_process(&service_name);
+              let _ = ProcessManager::kill_process(pid);
+            }
             // Emit error event to frontend
             let _ = app_handle.emit(
               "service-error",
               ServiceErrorEvent {
                 service_name: service_name.clone(),
                 error: format!("Process error: {}", err),
+                fatal: true,
               },
             );
           }
           CommandEvent::Terminated(payload) => {
             log::warn!(
-              "[{}] Process terminated with code: {:?}. Will be cleaned up by verification cycle.",
+              "[{}] Process terminated with code: {:?}.",
               service_name,
               payload.code
             );
-            // Don't remove here - let verify_port_forwards() handle cleanup
-            // so the frontend gets properly notified via verify_and_update_port_forwards
+            let was_managed = process_manager
+              .remove_process(&service_name)
+              .ok()
+              .flatten()
+              .is_some();
+            if was_managed {
+              let _ = app_handle.emit(
+                "service-error",
+                ServiceErrorEvent {
+                  service_name: service_name.clone(),
+                  error: "Port forward stopped unexpectedly".to_string(),
+                  fatal: true,
+                },
+              );
+            }
           }
           _ => {}
         }
@@ -325,6 +387,7 @@ impl PortForwardService {
   }
 
   pub fn get_running_services(&self) -> Result<Vec<String>> {
+    self.verify_port_forwards()?;
     self.process_manager.get_running_services()
   }
 
@@ -405,5 +468,35 @@ impl PortForwardService {
     }
 
     Ok(synced_services)
+  }
+}
+
+fn is_fatal_forward_error(error: &str) -> bool {
+  let error = error.to_ascii_lowercase();
+  error.contains("error forwarding port")
+    || error.contains("error creating forwarding stream")
+    || error.contains("lost connection to pod")
+    || error.contains("administratively prohibited")
+}
+
+#[cfg(test)]
+mod tests {
+  use super::is_fatal_forward_error;
+
+  #[test]
+  fn identifies_broken_forward_errors() {
+    assert!(is_fatal_forward_error(
+      "an error occurred forwarding 8101 -> 5432: error forwarding port 5432 to pod"
+    ));
+    assert!(is_fatal_forward_error("lost connection to pod"));
+    assert!(is_fatal_forward_error(
+      "error creating forwarding stream for port 8101 -> 5432"
+    ));
+  }
+
+  #[test]
+  fn ignores_non_fatal_process_output() {
+    assert!(!is_fatal_forward_error("Handling connection for 8101"));
+    assert!(!is_fatal_forward_error("Forwarding from 127.0.0.1:8101"));
   }
 }

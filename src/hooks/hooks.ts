@@ -1,10 +1,13 @@
 import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import { useEffect, useState } from "react"
+import { groupConfigsByContext } from "../utils/groupingUtils"
+import { appendLatestServiceError } from "../utils/serviceErrors"
 
 type ServiceErrorEvent = {
   service_name: string
   error: string
+  fatal?: boolean
 }
 
 export type ServiceStatus = {
@@ -82,7 +85,7 @@ export let useConfigs = (
             ...service,
             running: !stoppedServices.includes(service.name) && service.running,
             errors: stoppedServices.includes(service.name)
-              ? [...(service.errors || []), "Port forward stopped unexpectedly"]
+              ? appendLatestServiceError(service.errors, "Port forward stopped unexpectedly")
               : service.errors,
           })),
         )
@@ -105,11 +108,15 @@ export let useConfigs = (
 
     // Listen for runtime errors from port forward processes
     let unlistenPromise = listen<ServiceErrorEvent>("service-error", (event) => {
-      let { service_name, error } = event.payload
+      let { service_name, error, fatal } = event.payload
       setServices((prev) =>
         prev.map((service) =>
           service.name === service_name
-            ? { ...service, errors: [...(service.errors || []), error] }
+            ? {
+                ...service,
+                running: fatal ? false : service.running,
+                errors: appendLatestServiceError(service.errors, error),
+              }
             : service,
         ),
       )
@@ -201,6 +208,24 @@ export let useConfigs = (
     } catch (error) {
       setConfigs(configs)
       setMessage(`Error reordering config: ${error}`)
+    }
+  }
+
+  let reorderGroup = async (groupKey: string, newIndex: number) => {
+    let groups = groupConfigsByContext(configs)
+    let oldIndex = groups.findIndex((group) => group.context === groupKey)
+    if (oldIndex === -1 || newIndex < 0 || newIndex >= groups.length) return
+
+    let newGroups = [...groups]
+    let [movedGroup] = newGroups.splice(oldIndex, 1)
+    newGroups.splice(newIndex, 0, movedGroup)
+    setConfigs(newGroups.flatMap((group) => group.configs))
+
+    try {
+      await invoke("reorder_port_forward_group", { groupKey, newIndex })
+    } catch (error) {
+      setConfigs(configs)
+      setMessage(`Error reordering group: ${error}`)
     }
   }
 
@@ -319,6 +344,7 @@ export let useConfigs = (
     removeConfig,
     updateConfig,
     reorderConfig,
+    reorderGroup,
     loadContexts,
     loadNamespaces,
     loadServices,

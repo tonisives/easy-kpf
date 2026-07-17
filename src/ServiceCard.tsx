@@ -31,7 +31,10 @@ let ServiceCard = ({
   onSettings,
   onClearError,
 }: ServiceCardProps) => {
-  let { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  let { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    data: { type: "service", serviceName: name },
+  })
 
   let style = {
     transform: CSS.Transform.toString(transform),

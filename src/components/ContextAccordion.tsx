@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import ServiceCard from "../ServiceCard"
 import { PortForwardConfig, ServiceStatus } from "../hooks/hooks"
 import { GroupedConfig } from "../utils/groupingUtils"
@@ -12,6 +12,9 @@ type ContextAccordionProps = {
   onStop: (serviceName: string) => void
   onSettings: (serviceName: string) => void
   onClearError: (serviceName: string) => void
+  isExpanded: boolean
+  onToggle: () => void
+  dragDisabled?: boolean
 }
 
 let ContextAccordion = ({
@@ -22,10 +25,29 @@ let ContextAccordion = ({
   onStop,
   onSettings,
   onClearError,
+  isExpanded,
+  onToggle,
+  dragDisabled = false,
 }: ContextAccordionProps) => {
-  let [isExpanded, setIsExpanded] = useState(true)
+  let groupId = `group:${group.context}`
+  let {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: groupId,
+    data: { type: "group", groupKey: group.context },
+    disabled: dragDisabled,
+  })
 
-  let toggleExpanded = () => setIsExpanded(!isExpanded)
+  let style = {
+    transform: CSS.Transform.toString(transform),
+    transition: isDragging ? "none" : transition || "transform 200ms ease",
+    opacity: isDragging ? 0.5 : 1,
+  }
 
   let getContextDisplayName = (context: string, configs: PortForwardConfig[]) => {
     if (configs.some(config => config.forward_type === "Ssh")) {
@@ -39,20 +61,41 @@ let ContextAccordion = ({
   ).length
 
   return (
-    <div className="context-accordion">
-      <div className="accordion-header" onClick={toggleExpanded}>
-        <div className="accordion-title">
-          <span className="expand-icon" style={{
-            transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-            transition: "transform 0.2s"
-          }}>
-            ▶
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`context-accordion ${isDragging ? "is-dragging" : ""}`}
+    >
+      <div className="accordion-header">
+        <button
+          type="button"
+          className="group-drag-handle"
+          title={dragDisabled ? "Clear the filter to reorder groups" : "Drag to reorder group"}
+          disabled={dragDisabled}
+          {...attributes}
+          {...listeners}
+        >
+          ⋮⋮
+        </button>
+        <button
+          type="button"
+          className="accordion-toggle"
+          onClick={onToggle}
+          aria-expanded={isExpanded}
+        >
+          <span className="accordion-title">
+            <span className="expand-icon" style={{
+              transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+              transition: "transform 0.2s"
+            }}>
+              ▶
+            </span>
+            <h3>{getContextDisplayName(group.context, group.configs)}</h3>
+            <span className="config-count">
+              ({group.configs.length} service{group.configs.length !== 1 ? 's' : ''}, {runningCount} running)
+            </span>
           </span>
-          <h3>{getContextDisplayName(group.context, group.configs)}</h3>
-          <span className="config-count">
-            ({group.configs.length} service{group.configs.length !== 1 ? 's' : ''}, {runningCount} running)
-          </span>
-        </div>
+        </button>
       </div>
 
       {isExpanded && (

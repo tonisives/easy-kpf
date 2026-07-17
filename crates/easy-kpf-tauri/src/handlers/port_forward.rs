@@ -55,6 +55,17 @@ pub fn reorder_port_forward_config(
 }
 
 #[tauri::command]
+pub fn reorder_port_forward_group(
+  group_key: String,
+  new_index: usize,
+  port_forward_service: State<'_, PortForwardService>,
+) -> Result<(), String> {
+  port_forward_service
+    .reorder_group(&group_key, new_index)
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn start_port_forward_by_key(
   service_key: String,
   port_forward_service: State<'_, PortForwardService>,

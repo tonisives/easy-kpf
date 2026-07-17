@@ -85,6 +85,7 @@ pub fn run() {
       update_port_forward_config,
       remove_port_forward_config,
       reorder_port_forward_config,
+      reorder_port_forward_group,
       start_port_forward_by_key,
       stop_port_forward,
       get_running_services,

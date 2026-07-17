@@ -1112,8 +1112,15 @@ button:disabled {
   margin-bottom: 16px;
 }
 
+.context-accordion.is-dragging {
+  position: relative;
+  z-index: 2;
+}
+
 .accordion-header {
-  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 12px;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
@@ -1124,6 +1131,54 @@ button:disabled {
 
 .accordion-header:hover {
   background-color: var(--hover-bg);
+}
+
+.accordion-toggle {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.group-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: grab;
+  font-size: 14px;
+  user-select: none;
+}
+
+.group-drag-handle:hover:not(:disabled) {
+  color: var(--text-secondary);
+}
+
+.group-drag-handle:active:not(:disabled) {
+  cursor: grabbing;
+}
+
+.group-drag-handle:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.group-drag-overlay {
+  padding: 8px 12px;
+  border: 1px solid var(--accent-color);
+  border-radius: 4px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .accordion-title {
