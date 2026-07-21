@@ -8,7 +8,7 @@ A tool for managing Kubernetes port forwarding. Available as both a **GUI deskto
 <td width="50%" align="center"><strong>TUI (Terminal)</strong></td>
 </tr>
 <tr>
-<td><img src="etc/images/out.gif" alt="GUI Demo"/></td>
+<td><img src="etc/images/easy-kpf-native-main.png" alt="EasyKpf desktop app"/></td>
 <td><img src="etc/images/tui/demo-easy-kpf.gif" alt="TUI Demo"/></td>
 </tr>
 </table>
@@ -20,6 +20,8 @@ A tool for managing Kubernetes port forwarding. Available as both a **GUI deskto
 - Real-time status monitoring
 - Persistent configuration storage
 - Context grouping with collapsible sections
+- Persistent group collapse state and drag reordering
+- Connection health verification and one-click reconnect
 - SSH port forwarding support
 - Local interface selection: 127.0.0.{x}
 - Auto-suggest names based on service/context
@@ -32,11 +34,11 @@ A tool for managing Kubernetes port forwarding. Available as both a **GUI deskto
 <td width="50%" align="center"><strong>TUI</strong></td>
 </tr>
 <tr>
-<td><img src="etc/images/appstore_screenshots/one_1280x800.png" alt="GUI Main View"/></td>
+<td><img src="etc/images/easy-kpf-native-main.png" alt="GUI Main View"/></td>
 <td><img src="etc/images/tui/1-view-and-start.png" alt="TUI Main View"/></td>
 </tr>
 <tr>
-<td><img src="etc/images/appstore_screenshots/two_1280x800.png" alt="GUI Configuration"/></td>
+<td><img src="etc/images/easy-kpf-native-add.png" alt="GUI Configuration"/></td>
 <td><img src="etc/images/tui/2-add-config.png" alt="TUI Add Config"/></td>
 </tr>
 <tr>
@@ -74,7 +76,7 @@ Download the latest build from [Releases](https://github.com/tonisives/easy-kpf/
 
 ```bash
 pnpm install
-pnpm tauri dev
+make dev
 ```
 
 ## Build
