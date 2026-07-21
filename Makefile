@@ -16,7 +16,7 @@ release:
 		echo "Release requires a clean worktree."; \
 		exit 1; \
 	fi; \
-	git fetch origin main; \
+	git fetch origin main --tags; \
 	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then \
 		echo "Local main must match origin/main before releasing."; \
 		exit 1; \
