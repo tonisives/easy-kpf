@@ -85,6 +85,22 @@ make dev
 pnpm tauri build
 ```
 
+## Release
+
+Create the next patch release and start the GitHub Actions release workflow:
+
+```bash
+make release
+```
+
+To choose an explicit version instead:
+
+```bash
+make release VERSION=0.4.0
+```
+
+Releases must be started from a clean `main` branch that matches `origin/main`.
+
 ## Configuration
 
 Port forward configurations are stored in YAML files in the system config directory:

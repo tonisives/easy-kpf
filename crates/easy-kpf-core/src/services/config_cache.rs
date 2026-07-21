@@ -213,7 +213,7 @@ mod tests {
   }
 
   #[test]
-  fn reorders_context_groups_without_changing_service_order() {
+  fn reorders_context_groups_without_changing_service_order() -> Result<()> {
     let configs = vec![
       config("a-1", "a", ForwardType::Kubectl),
       config("a-2", "a", ForwardType::Kubectl),
@@ -221,29 +221,31 @@ mod tests {
       config("c-1", "c", ForwardType::Kubectl),
     ];
 
-    let reordered = reorder_group_configs(configs, "c", 0).unwrap();
+    let reordered = reorder_group_configs(configs, "c", 0)?;
     let names: Vec<&str> = reordered
       .iter()
       .map(|config| config.name.as_str())
       .collect();
 
     assert_eq!(names, vec!["c-1", "a-1", "a-2", "b-1"]);
+    Ok(())
   }
 
   #[test]
-  fn treats_ssh_configs_as_one_group() {
+  fn treats_ssh_configs_as_one_group() -> Result<()> {
     let configs = vec![
       config("kube", "cluster", ForwardType::Kubectl),
       config("ssh-1", "ignored-1", ForwardType::Ssh),
       config("ssh-2", "ignored-2", ForwardType::Ssh),
     ];
 
-    let reordered = reorder_group_configs(configs, "SSH", 0).unwrap();
+    let reordered = reorder_group_configs(configs, "SSH", 0)?;
     let names: Vec<&str> = reordered
       .iter()
       .map(|config| config.name.as_str())
       .collect();
 
     assert_eq!(names, vec!["ssh-1", "ssh-2", "kube"]);
+    Ok(())
   }
 }
