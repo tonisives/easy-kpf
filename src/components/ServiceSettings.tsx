@@ -16,19 +16,22 @@ let ServiceSettings = ({ config, onEdit, onDelete, onClose, configs }: ServiceSe
   return (
     <div className="settings-modal">
       <div className="service-settings-popup">
-        <h3>Settings for {config.name}</h3>
+        <div className="dialog-heading">
+          <h3>{config.name}</h3>
+          <p>Port forward configuration</p>
+        </div>
         <div className="config-details">
           <p>
-            <strong>Context:</strong> {config.context}
+            <strong>Context</strong><span>{config.context}</span>
           </p>
           <p>
-            <strong>Namespace:</strong> {config.namespace}
+            <strong>Namespace</strong><span>{config.namespace}</span>
           </p>
           <p>
-            <strong>Service:</strong> {config.service}
+            <strong>Service</strong><span>{config.service}</span>
           </p>
           <p>
-            <strong>Ports:</strong> {config.ports.join(", ")}
+            <strong>Ports</strong><span>{config.ports.join(", ")}</span>
           </p>
         </div>
         <div className="service-settings-actions">
@@ -39,7 +42,7 @@ let ServiceSettings = ({ config, onEdit, onDelete, onClose, configs }: ServiceSe
             }}
             className="edit-button"
           >
-            Edit Configuration
+            Edit...
           </button>
           <button
             onClick={() => {
@@ -48,7 +51,7 @@ let ServiceSettings = ({ config, onEdit, onDelete, onClose, configs }: ServiceSe
             }}
             className="delete-button"
           >
-            Delete Configuration
+            Delete
           </button>
           <button onClick={onClose} className="cancel-button">
             Cancel

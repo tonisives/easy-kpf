@@ -69,32 +69,33 @@ let ContextAccordion = ({
       <div className="accordion-header">
         <button
           type="button"
+          className="accordion-toggle"
+          onClick={onToggle}
+          aria-expanded={isExpanded}
+        >
+          <span className="accordion-title">
+            <span className={`expand-icon ${isExpanded ? "expanded" : ""}`}>
+              <svg width="8" height="11" viewBox="0 0 8 11" aria-hidden="true">
+                <path d="m2 1.5 4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <h3>{getContextDisplayName(group.context, group.configs)}</h3>
+            <span className="config-count">
+              {group.configs.length} service{group.configs.length !== 1 ? 's' : ''} · {runningCount} connected
+            </span>
+          </span>
+        </button>
+        <button
+          type="button"
           className="group-drag-handle"
           title={dragDisabled ? "Clear the filter to reorder groups" : "Drag to reorder group"}
           disabled={dragDisabled}
           {...attributes}
           {...listeners}
         >
-          ⋮⋮
-        </button>
-        <button
-          type="button"
-          className="accordion-toggle"
-          onClick={onToggle}
-          aria-expanded={isExpanded}
-        >
-          <span className="accordion-title">
-            <span className="expand-icon" style={{
-              transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-              transition: "transform 0.2s"
-            }}>
-              ▶
-            </span>
-            <h3>{getContextDisplayName(group.context, group.configs)}</h3>
-            <span className="config-count">
-              ({group.configs.length} service{group.configs.length !== 1 ? 's' : ''}, {runningCount} running)
-            </span>
-          </span>
+          <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true">
+            <g fill="currentColor"><circle cx="3" cy="4" r="1"/><circle cx="7" cy="4" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/><circle cx="3" cy="12" r="1"/><circle cx="7" cy="12" r="1"/></g>
+          </svg>
         </button>
       </div>
 

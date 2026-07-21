@@ -131,187 +131,91 @@ let SetupScreen = ({ onSetupComplete, onCancel, isDialog }: SetupScreenProps) =>
   }, [])
 
   let content = (
-    <div style={{ padding: "20px", maxWidth: "600px", margin: "0 auto" }}>
-      <h2>Setup kubectl</h2>
-      <p>We need to locate kubectl on your system to manage port forwarding.</p>
-      {!isValid || isValidating ? (
-        <div style={{ marginBottom: "20px" }}>
-          <button
-            onClick={detectKubectl}
-            disabled={isDetecting}
-            style={{
-              padding: "10px 20px",
-              marginBottom: "10px",
-              backgroundColor: "#007acc",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: isDetecting ? "not-allowed" : "pointer",
-            }}
-          >
-            {isDetecting ? "Detecting..." : "Auto-detect kubectl"}
-          </button>
-        </div>
-      ) : null}
-
-      <div style={{ marginBottom: "20px" }}>
-        <label style={{ display: "block", marginBottom: "5px" }}>kubectl path:</label>
-        <input
-          type="text"
-          value={kubectlPath}
-          onChange={(e) => handlePathChange(e.target.value)}
-          placeholder="/opt/homebrew/bin/kubectl"
-          style={{
-            width: "100%",
-            padding: "10px",
-            border: `2px solid ${isValid ? "#4caf50" : error ? "#f44336" : "#ddd"}`,
-            borderRadius: "4px",
-            fontSize: "14px",
-          }}
-        />
-        {isValidating && <p style={{ color: "#666", margin: "5px 0" }}>Validating...</p>}
-        {isValid && (
-          <p style={{ color: "#4caf50", margin: "5px 0" }}>✓ kubectl found and working</p>
-        )}
-        {error && <p style={{ color: "#f44336", margin: "5px 0" }}>{error}</p>}
+    <div className="setup-panel">
+      <div className="dialog-heading">
+        <h2>{isDialog ? "Kubernetes Settings" : "Set Up EasyKpf"}</h2>
+        <p>Choose the command and configuration EasyKpf should use.</p>
       </div>
 
-      {!isValid || isValidating ? (
-        <div style={{ marginTop: "20px", fontSize: "12px", color: "#666" }}>
-          <p>
-            <strong>Common kubectl locations:</strong>
-          </p>
-          <ul>
-            <li>/opt/homebrew/bin/kubectl (Homebrew on Apple Silicon)</li>
-            <li>/usr/local/bin/kubectl (Homebrew on Intel Mac)</li>
-            <li>/usr/bin/kubectl (System installation)</li>
-            <li>/snap/bin/kubectl (Snap on Linux)</li>
-          </ul>
-        </div>
-      ) : null}
-
-      {/* Separator */}
-      <hr
-        style={{
-          margin: "30px 0",
-          border: "none",
-          borderTop: "1px solid #ddd",
-        }}
-      />
-
-      {/* KUBECONFIG Section */}
-      <h3 style={{ marginBottom: "10px", fontSize: "18px" }}>KUBECONFIG Configuration</h3>
-      <p style={{ marginBottom: "20px", color: "#666" }}>
-        Configure which Kubernetes config file to use.
-      </p>
-
-      <div style={{ marginBottom: "20px" }}>
-        <label style={{ display: "block", marginBottom: "5px" }}>KUBECONFIG path:</label>
-        <input
-          type="text"
-          value={editableKubeconfigPath}
-          onChange={(e) => handleKubeconfigChange(e.target.value)}
-          placeholder={kubeconfigPath || "Not set (using default ~/.kube/config)"}
-          style={{
-            width: "100%",
-            padding: "10px",
-            border: `2px solid ${kubeconfigPath ? "#4caf50" : kubeconfigError ? "#f44336" : "#ddd"}`,
-            borderRadius: "4px",
-            fontSize: "14px",
-          }}
-        />
-        {isSettingKubeconfig && (
-          <p style={{ color: "#666", margin: "5px 0" }}>Setting KUBECONFIG...</p>
-        )}
-        {kubeconfigPath && !kubeconfigError && (
-          <p style={{ color: "#4caf50", margin: "5px 0" }}>✓ KUBECONFIG environment variable set</p>
-        )}
-        {!kubeconfigPath && !kubeconfigError && (
-          <p style={{ color: "#ff9800", margin: "5px 0" }}>
-            ⚠️ KUBECONFIG not set, using default config
-          </p>
-        )}
-        {kubeconfigError && <p style={{ color: "#f44336", margin: "5px 0" }}>{kubeconfigError}</p>}
-        {editableKubeconfigPath !== (kubeconfigPath || "") && (
-          <button
-            onClick={handleSetKubeconfig}
-            disabled={!editableKubeconfigPath.trim() || isSettingKubeconfig}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: editableKubeconfigPath.trim() ? "#4caf50" : "#ccc",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: editableKubeconfigPath.trim() ? "pointer" : "not-allowed",
-              marginTop: "10px",
-            }}
-          >
-            {isSettingKubeconfig ? "Setting..." : "Set KUBECONFIG"}
-          </button>
-        )}
-      </div>
-
-      {/* Available Contexts */}
-      {(kubeconfigPath || availableContexts.length > 0) && (
-        <div style={{ marginBottom: "20px" }}>
-          <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>
-            Available Contexts:
-          </label>
-          {isLoadingContexts ? (
-            <p style={{ color: "#666", margin: "5px 0" }}>Loading contexts...</p>
-          ) : availableContexts.length > 0 ? (
-            <div
-              style={{
-                border: "1px solid #666666",
-                borderRadius: "4px",
-                padding: "10px",
-                backgroundColor: "darkgray",
-                maxHeight: "120px",
-                overflowY: "auto",
-              }}
-            >
-              {availableContexts.map((context, index) => (
-                <div
-                  key={index}
-                  style={{
-                    padding: "2px 0",
-                    fontSize: "14px",
-                    color: "#333",
-                  }}
-                >
-                  • {context}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p style={{ color: "#ff9800", margin: "5px 0" }}>No contexts found</p>
+      <section className="setup-section">
+        <div className="setup-section-heading">
+          <h3>kubectl</h3>
+          {(!isValid || isValidating) && (
+            <button type="button" onClick={detectKubectl} disabled={isDetecting}>
+              {isDetecting ? "Detecting..." : "Detect Automatically"}
+            </button>
           )}
         </div>
-      )}
+        <div className="form-group">
+          <label>Command Path</label>
+          <input
+            type="text"
+            value={kubectlPath}
+            onChange={(event) => handlePathChange(event.target.value)}
+            placeholder="/opt/homebrew/bin/kubectl"
+            className={error ? "input-error" : isValid ? "input-success" : ""}
+          />
+          {isValidating && <p className="setup-status">Validating...</p>}
+          {isValid && <p className="setup-status success">kubectl is available and working.</p>}
+          {error && <p className="setup-status error">{error}</p>}
+          {!isValid && !isValidating && (
+            <p className="field-help">Common locations include /opt/homebrew/bin/kubectl and /usr/local/bin/kubectl.</p>
+          )}
+        </div>
+      </section>
 
-      {/* Separator */}
-      <hr
-        style={{
-          margin: "30px 0",
-          border: "none",
-          borderTop: "1px solid #ddd",
-        }}
-      />
+      <section className="setup-section">
+        <div className="setup-section-heading">
+          <div>
+            <h3>Kubernetes Configuration</h3>
+            <p>Leave this blank to use ~/.kube/config.</p>
+          </div>
+        </div>
+        <div className="form-group">
+          <label>KUBECONFIG Path</label>
+          <div className="form-control-row">
+            <input
+              type="text"
+              value={editableKubeconfigPath}
+              onChange={(event) => handleKubeconfigChange(event.target.value)}
+              placeholder={kubeconfigPath || "Default configuration"}
+              className={kubeconfigError ? "input-error" : ""}
+            />
+            {editableKubeconfigPath !== (kubeconfigPath || "") && (
+              <button
+                type="button"
+                onClick={handleSetKubeconfig}
+                disabled={!editableKubeconfigPath.trim() || isSettingKubeconfig}
+              >
+                {isSettingKubeconfig ? "Applying..." : "Apply"}
+              </button>
+            )}
+          </div>
+          {kubeconfigPath && !kubeconfigError && <p className="setup-status success">Custom configuration is active.</p>}
+          {!kubeconfigPath && !kubeconfigError && <p className="setup-status">Using the default Kubernetes configuration.</p>}
+          {kubeconfigError && <p className="setup-status error">{kubeconfigError}</p>}
+        </div>
 
-      <div style={{ display: "flex", width: "100%", justifyContent: "start", gap: "10px" }}>
-        <button
-          onClick={handleSave}
-          disabled={!isValid || isValidating}
-          style={{
-            padding: "10px 20px",
-            backgroundColor: isValid ? "#4caf50" : "#ccc",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: isValid ? "pointer" : "not-allowed",
-          }}
-        >
-          {isDialog && onCancel ? "Ok" : "Continue"}
+        {(kubeconfigPath || availableContexts.length > 0) && (
+          <div className="context-list-section">
+            <label>Available Contexts</label>
+            {isLoadingContexts ? (
+              <p className="setup-status">Loading contexts...</p>
+            ) : availableContexts.length > 0 ? (
+              <div className="context-list">
+                {availableContexts.map((context) => <div key={context}>{context}</div>)}
+              </div>
+            ) : (
+              <p className="setup-status">No contexts found.</p>
+            )}
+          </div>
+        )}
+      </section>
+
+      <div className="dialog-actions">
+        {isDialog && onCancel && <button type="button" onClick={onCancel}>Cancel</button>}
+        <button type="button" className="primary-button" onClick={handleSave} disabled={!isValid || isValidating}>
+          {isDialog ? "Done" : "Continue"}
         </button>
       </div>
     </div>
@@ -319,13 +223,11 @@ let SetupScreen = ({ onSetupComplete, onCancel, isDialog }: SetupScreenProps) =>
 
   if (isDialog) {
     return (
-      <div className="settings-modal">
-        <div className="service-settings-popup">{content}</div>
-      </div>
+      <div className="settings-modal">{content}</div>
     )
   }
 
-  return content
+  return <main className="setup-screen">{content}</main>
 }
 
 export default SetupScreen

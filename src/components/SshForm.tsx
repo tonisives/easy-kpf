@@ -86,9 +86,6 @@ export let SshForm = ({
 
       {testMessage && (
         <div className={`test-feedback ${testStatus}`}>
-          <span className="test-icon">
-            {testStatus === "success" ? "✓" : testStatus === "error" ? "✗" : "⏳"}
-          </span>
           <span className="test-message">{testMessage}</span>
         </div>
       )}

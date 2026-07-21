@@ -91,14 +91,14 @@ let AddConfigForm = ({
     <div className="add-form-modal">
       <div className="add-form">
         <h3>
-          {isEditing ? "Edit Port Forward Configuration" : "Add New Port Forward Configuration"}
+          {isEditing ? "Edit Port Forward" : "Add Port Forward"}
         </h3>
 
         <ErrorBanner error={error} onClearError={onClearError} />
 
         <div className="form-group">
-          <label>Connection Type:</label>
-          <div style={{ display: "flex", gap: "10px" }}>
+          <label>Connection Type</label>
+          <div className="segmented-control">
             <button
               type="button"
               className={connectionType === "kubernetes" ? "tab-button active" : "tab-button"}
@@ -167,4 +167,3 @@ let AddConfigForm = ({
 }
 
 export default AddConfigForm
-

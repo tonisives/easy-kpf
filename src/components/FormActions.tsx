@@ -5,11 +5,11 @@ type FormActionsProps = {
 
 export let FormActions = ({ isEditing, onCancel }: FormActionsProps) => (
   <div className="form-actions">
-    <button type="submit">
-      {isEditing ? "Update Configuration" : "Add Configuration"}
-    </button>
-    <button type="button" onClick={onCancel}>
+    <button type="button" onClick={onCancel} className="cancel-button">
       Cancel
+    </button>
+    <button type="submit" className="primary-button">
+      {isEditing ? "Save" : "Add"}
     </button>
   </div>
 )

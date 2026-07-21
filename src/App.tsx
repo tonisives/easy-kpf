@@ -142,6 +142,7 @@ function App() {
   }, [configs, searchQuery])
 
   let groupedConfigs = useMemo(() => groupConfigsByContext(filteredConfigs), [filteredConfigs])
+  let runningCount = services.filter((service) => service.running).length
 
   let toggleGroup = (groupKey: string) => {
     setCollapsedGroups((previous) => {
@@ -215,39 +216,24 @@ function App() {
 
   return (
     <main className="container">
-      <div className="header-row">
-        <h1>Kubernetes Port Forwarding</h1>
-        <div className="header-actions">
-          <button
-            onClick={() => reconnectAll()}
-            className="add-button"
-            disabled={!services.some((s) => !s.running && s.errors && s.errors.length > 0)}
-            title="Reconnect all disconnected services"
-          >
-            Reconnect All
-          </button>
-          <button onClick={() => setShowAddForm(true)} className="add-button">
-            Add New Configuration
-          </button>
-          <button onClick={() => setShowSettings(true)} className="settings-icon-button" title="Settings">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
-              <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
-            </svg>
-          </button>
+      <header className="header-row">
+        <div className="window-title">
+          <h1>Port Forwards</h1>
+          <span>{runningCount} connected</span>
         </div>
-      </div>
-
-      <div className="search-container">
         <div className={`search-input-wrapper ${searchFocused ? "focused" : ""}`}>
-          <span className="search-icon">⌕</span>
+          <svg className="search-icon" width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="6.75" cy="6.75" r="4.75" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            <path d="m10.25 10.25 3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
           <input
             ref={searchInputRef}
-            type="text"
+            type="search"
             className="search-input"
-            placeholder="Filter port forwards... (/ or Cmd+F)"
+            placeholder="Search"
+            aria-label="Filter port forwards"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(event) => setSearchQuery(event.target.value)}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             autoComplete="off"
@@ -257,25 +243,66 @@ function App() {
           />
           {searchQuery && (
             <button
+              type="button"
               className="search-clear"
               onClick={() => {
                 setSearchQuery("")
                 searchInputRef.current?.focus()
               }}
-              title="Clear search (Esc)"
+              title="Clear search"
+              aria-label="Clear search"
             >
-              x
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                <circle cx="6" cy="6" r="5" fill="currentColor" opacity="0.55" />
+                <path d="m4.25 4.25 3.5 3.5m0-3.5-3.5 3.5" stroke="white" strokeWidth="1.25" strokeLinecap="round" />
+              </svg>
             </button>
           )}
         </div>
-        {searchQuery && (
-          <span className="search-results-count">
-            {filteredConfigs.length} of {configs.length} shown
-          </span>
-        )}
-      </div>
+        <div className="header-actions">
+          <button
+            onClick={() => reconnectAll()}
+            className="toolbar-button"
+            disabled={!services.some((s) => !s.running && s.errors && s.errors.length > 0)}
+            title="Reconnect all disconnected services"
+          >
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M13.5 4.5V1.75m0 0h-2.75m2.75 0-2.1 2.1a5.25 5.25 0 1 0 1.4 5.05" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>Reconnect</span>
+          </button>
+          <button onClick={() => setShowAddForm(true)} className="toolbar-button primary-toolbar-button">
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 2v10M2 7h10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <span>Add</span>
+          </button>
+          <button onClick={() => setShowSettings(true)} className="settings-icon-button" title="Settings">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+              <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
+            </svg>
+          </button>
+        </div>
+      </header>
 
       <div className="services-section">
+        {searchQuery && (
+          <div className="search-results-count">
+            {filteredConfigs.length} of {configs.length} port forwards
+          </div>
+        )}
+        {groupedConfigs.length === 0 && (
+          <div className="empty-state">
+            <h2>{searchQuery ? "No Matches" : "No Port Forwards"}</h2>
+            <p>{searchQuery ? "Try a different search." : "Add a Kubernetes or SSH port forward to get started."}</p>
+            {!searchQuery && (
+              <button className="primary-button" onClick={() => setShowAddForm(true)}>
+                Add Port Forward
+              </button>
+            )}
+          </div>
+        )}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}

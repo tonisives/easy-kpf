@@ -45,25 +45,23 @@ let ServiceCard = ({
   return (
     <div ref={setNodeRef} style={style} className="service-group">
       <div className="service-header">
-        <div className="drag-handle" title="Drag to reorder" {...attributes} {...listeners}>
-          ⋮⋮
-        </div>
+        <span className={`status-indicator ${isRunning ? "running" : "stopped"}`} aria-hidden="true" />
         <div className="service-info">
-          <div style={{ display: "flex", gap: "10px" }}>
-            <h3>{displayName}</h3>
+          <h3>{displayName}</h3>
+          <div className="service-metadata">
+            <span>{context}</span>
+            <span>{namespace}</span>
+            <span>{ports.replace(/^Ports:\s*/, "")}</span>
           </div>
-          <p>
-            Context: {context} | Namespace: {namespace} | {ports}
-          </p>
         </div>
         <div className="service-status-controls">
           {!isRunning ? (
             <button onClick={onStart} disabled={isLoading} className="start-button">
-              {isLoading ? "Starting..." : "Start"}
+              {isLoading ? "Connecting..." : "Connect"}
             </button>
           ) : (
             <button onClick={onStop} disabled={isLoading} className="stop-button">
-              {isLoading ? "Stopping..." : "Stop"}
+              {isLoading ? "Disconnecting..." : "Disconnect"}
             </button>
           )}
           <button onClick={onSettings} className="settings-icon-button" title="Settings">
@@ -73,6 +71,11 @@ let ServiceCard = ({
             </svg>
           </button>
         </div>
+        <button type="button" className="drag-handle" title="Drag to reorder" aria-label="Drag to reorder" {...attributes} {...listeners}>
+          <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true">
+            <g fill="currentColor"><circle cx="3" cy="4" r="1"/><circle cx="7" cy="4" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/><circle cx="3" cy="12" r="1"/><circle cx="7" cy="12" r="1"/></g>
+          </svg>
+        </button>
       </div>
 
       {errors && errors.length > 0 && (
