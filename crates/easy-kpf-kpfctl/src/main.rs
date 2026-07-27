@@ -14,12 +14,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-  #[command(about = "Start services from the last-active set that aren't running")]
+  #[command(about = "Restart every service in the last-active set")]
   ReconnectAll,
-  #[command(about = "Start a port forward by config name")]
-  Start { name: String },
-  #[command(about = "Stop a port forward by config name")]
-  Stop { name: String },
+  #[command(about = "Control one port forward")]
+  Pf {
+    name: String,
+    #[command(subcommand)]
+    command: PortForwardCommand,
+  },
   #[command(about = "List all configured port forwards and their state")]
   List,
   #[command(about = "Show status of all port forwards")]
@@ -33,14 +35,27 @@ enum Command {
   },
 }
 
+#[derive(Subcommand)]
+enum PortForwardCommand {
+  #[command(about = "Start the port forward")]
+  Start,
+  #[command(about = "Stop the port forward")]
+  Stop,
+  #[command(about = "Reconnect the port forward")]
+  Reconnect,
+}
+
 #[tokio::main]
 async fn main() {
   let cli = Cli::parse();
 
   let request = match cli.command {
     Command::ReconnectAll => Request::ReconnectAll,
-    Command::Start { name } => Request::Start { name },
-    Command::Stop { name } => Request::Stop { name },
+    Command::Pf { name, command } => match command {
+      PortForwardCommand::Start => Request::Start { name },
+      PortForwardCommand::Stop => Request::Stop { name },
+      PortForwardCommand::Reconnect => Request::Reconnect { name },
+    },
     Command::List => Request::List,
     Command::Status => Request::Status,
     Command::Show => Request::Show,
@@ -53,4 +68,24 @@ async fn main() {
   };
 
   client::send(request).await;
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{Cli, Command, PortForwardCommand};
+  use clap::Parser;
+
+  #[test]
+  fn parses_single_port_forward_reconnect_command() {
+    let cli = Cli::try_parse_from(["ekpfctl", "pf", "db gp", "reconnect"])
+      .expect("port-forward reconnect command should parse");
+
+    assert!(matches!(
+      cli.command,
+      Command::Pf {
+        name,
+        command: PortForwardCommand::Reconnect
+      } if name == "db gp"
+    ));
+  }
 }

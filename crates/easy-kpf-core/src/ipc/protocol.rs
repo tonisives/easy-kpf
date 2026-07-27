@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "cmd", rename_all = "kebab-case")]
 pub enum Request {
   ReconnectAll,
+  Reconnect { name: String },
   Start { name: String },
   Stop { name: String },
   List,

@@ -5,6 +5,7 @@ use easy_kpf_core::services::{
 };
 use easy_kpf_core::types::{ForwardType, PortForwardConfig};
 use serde::Serialize;
+use std::time::Duration;
 use tauri::Emitter;
 
 use super::KubectlOperations;
@@ -123,6 +124,50 @@ impl PortForwardService {
     self.execute_port_forward(&config).await
   }
 
+  pub async fn restart_port_forward_by_key<K: KubectlOperations>(
+    &self,
+    kubectl_service: &K,
+    service_key: &str,
+  ) -> Result<String> {
+    let config = self.config_cache.find_config(service_key)?.ok_or_else(|| {
+      AppError::NotFound(format!(
+        "Configuration not found for service: {}",
+        service_key
+      ))
+    })?;
+
+    if let Some(pid) = self.process_manager.remove_process(service_key)? {
+      if let Err(error) = ProcessManager::kill_process(pid) {
+        self
+          .process_manager
+          .add_process(service_key.to_string(), pid, config.clone())?;
+        return Err(error);
+      }
+      self.wait_for_process_exit(service_key, pid).await?;
+    }
+
+    self
+      .start_port_forward_generic(kubectl_service, config)
+      .await
+  }
+
+  async fn wait_for_process_exit(&self, service_name: &str, pid: u32) -> Result<()> {
+    const PROCESS_EXIT_ATTEMPTS: usize = 50;
+    const PROCESS_EXIT_POLL: Duration = Duration::from_millis(100);
+
+    for _ in 0..PROCESS_EXIT_ATTEMPTS {
+      if !self.process_detector.is_process_actually_running(pid)? {
+        return Ok(());
+      }
+      tokio::time::sleep(PROCESS_EXIT_POLL).await;
+    }
+
+    Err(AppError::Process(format!(
+      "{} process {} did not exit after reconnect request",
+      service_name, pid
+    )))
+  }
+
   async fn execute_port_forward(&self, config: &PortForwardConfig) -> Result<String> {
     match config.forward_type {
       ForwardType::Kubectl => self.execute_kubectl_port_forward(config).await,
@@ -189,7 +234,7 @@ impl PortForwardService {
             let fatal = is_fatal_forward_error(&error_text);
             if !unhealthy && fatal {
               unhealthy = true;
-              let _ = process_manager.remove_process(&service_name);
+              let _ = process_manager.remove_process_if_pid(&service_name, pid);
               let _ = ProcessManager::kill_process(pid);
             }
             // Emit error event to frontend
@@ -206,7 +251,7 @@ impl PortForwardService {
             log::error!("[{}] Process error: {}", service_name, err);
             if !unhealthy {
               unhealthy = true;
-              let _ = process_manager.remove_process(&service_name);
+              let _ = process_manager.remove_process_if_pid(&service_name, pid);
               let _ = ProcessManager::kill_process(pid);
             }
             // Emit error event to frontend
@@ -226,10 +271,8 @@ impl PortForwardService {
               payload.code
             );
             let was_managed = process_manager
-              .remove_process(&service_name)
-              .ok()
-              .flatten()
-              .is_some();
+              .remove_process_if_pid(&service_name, pid)
+              .unwrap_or(false);
             if was_managed {
               let _ = app_handle.emit(
                 "service-error",
@@ -301,7 +344,7 @@ impl PortForwardService {
             let fatal = is_fatal_forward_error(&error_text);
             if !unhealthy && fatal {
               unhealthy = true;
-              let _ = process_manager.remove_process(&service_name);
+              let _ = process_manager.remove_process_if_pid(&service_name, pid);
               let _ = ProcessManager::kill_process(pid);
             }
             // Emit error event to frontend
@@ -318,7 +361,7 @@ impl PortForwardService {
             log::error!("[{}] Process error: {}", service_name, err);
             if !unhealthy {
               unhealthy = true;
-              let _ = process_manager.remove_process(&service_name);
+              let _ = process_manager.remove_process_if_pid(&service_name, pid);
               let _ = ProcessManager::kill_process(pid);
             }
             // Emit error event to frontend
@@ -338,10 +381,8 @@ impl PortForwardService {
               payload.code
             );
             let was_managed = process_manager
-              .remove_process(&service_name)
-              .ok()
-              .flatten()
-              .is_some();
+              .remove_process_if_pid(&service_name, pid)
+              .unwrap_or(false);
             if was_managed {
               let _ = app_handle.emit(
                 "service-error",

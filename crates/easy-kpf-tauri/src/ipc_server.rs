@@ -139,6 +139,15 @@ async fn dispatch(request: Request, app_handle: &tauri::AppHandle) -> Response {
       },
     },
 
+    Request::Reconnect { name } => match pf.restart_port_forward_by_key(kc.inner(), &name).await {
+      Ok(msg) => Response::Ok {
+        data: ResponseData::Text(msg),
+      },
+      Err(e) => Response::Err {
+        message: e.to_string(),
+      },
+    },
+
     Request::Stop { name } => match pf.stop_port_forward(&name) {
       Ok(msg) => Response::Ok {
         data: ResponseData::Text(msg),

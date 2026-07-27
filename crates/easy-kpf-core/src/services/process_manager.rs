@@ -149,6 +149,32 @@ impl ProcessManager {
     Ok(result)
   }
 
+  /// Remove a process only if the stored PID still belongs to the caller.
+  ///
+  /// Process termination events can arrive after a replacement process has
+  /// already been registered under the same service name. Matching the PID
+  /// prevents the old monitor from removing the new process.
+  pub fn remove_process_if_pid(&self, name: &str, pid: u32) -> Result<bool> {
+    let removed = {
+      let mut processes = self
+        .processes
+        .lock()
+        .map_err(|_| AppError::Process("Failed to acquire lock".to_string()))?;
+
+      if processes.get(name).is_some_and(|info| info.pid == pid) {
+        processes.remove(name);
+        true
+      } else {
+        false
+      }
+    };
+
+    if removed {
+      self.save_state()?;
+    }
+    Ok(removed)
+  }
+
   #[allow(dead_code)]
   pub fn get_process_pid(&self, name: &str) -> Result<Option<u32>> {
     let processes = self
@@ -252,5 +278,66 @@ impl ProcessManager {
 impl Default for ProcessManager {
   fn default() -> Self {
     Self::new()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::ProcessManager;
+  use crate::types::{ForwardType, PortForwardConfig};
+
+  fn config(name: &str) -> PortForwardConfig {
+    PortForwardConfig {
+      name: name.to_string(),
+      context: "test".to_string(),
+      namespace: "default".to_string(),
+      service: "database".to_string(),
+      ports: vec!["5432".to_string()],
+      local_interface: None,
+      forward_type: ForwardType::Kubectl,
+    }
+  }
+
+  #[test]
+  fn conditional_remove_does_not_remove_replacement_process() {
+    let manager = ProcessManager::new();
+    manager
+      .add_process("database".to_string(), 100, config("database"))
+      .expect("initial process should be added");
+    manager
+      .add_process("database".to_string(), 200, config("database"))
+      .expect("replacement process should be added");
+
+    let removed = manager
+      .remove_process_if_pid("database", 100)
+      .expect("conditional removal should succeed");
+
+    assert!(!removed);
+    assert_eq!(
+      manager
+        .get_process_pid("database")
+        .expect("process lookup should succeed"),
+      Some(200)
+    );
+  }
+
+  #[test]
+  fn conditional_remove_removes_matching_process() {
+    let manager = ProcessManager::new();
+    manager
+      .add_process("database".to_string(), 100, config("database"))
+      .expect("process should be added");
+
+    let removed = manager
+      .remove_process_if_pid("database", 100)
+      .expect("conditional removal should succeed");
+
+    assert!(removed);
+    assert_eq!(
+      manager
+        .get_process_pid("database")
+        .expect("process lookup should succeed"),
+      None
+    );
   }
 }

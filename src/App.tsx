@@ -263,8 +263,8 @@ function App() {
           <button
             onClick={() => reconnectAll()}
             className="toolbar-button"
-            disabled={!services.some((s) => !s.running && s.errors && s.errors.length > 0)}
-            title="Reconnect all disconnected services"
+            disabled={!services.some((s) => s.running || (s.errors && s.errors.length > 0))}
+            title="Restart all active services"
           >
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M13.5 4.5V1.75m0 0h-2.75m2.75 0-2.1 2.1a5.25 5.25 0 1 0 1.4 5.05" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />

@@ -1,30 +1,36 @@
 use crate::services::{KubectlService, PortForwardService};
-use easy_kpf_core::error::Result;
+use easy_kpf_core::error::{AppError, Result};
 
-/// Reconnect services the user had previously enabled (the last-active set).
-/// Skips services that are currently running. Never starts services the user
-/// hasn't explicitly enabled.
+/// Restart services the user had previously enabled (the last-active set).
+/// A live PID does not guarantee a usable tunnel, so running services are
+/// replaced as well. Never starts services the user hasn't explicitly enabled.
 pub async fn reconnect_all(
   port_forward_service: &PortForwardService,
   kubectl_service: &KubectlService,
 ) -> Result<Vec<String>> {
   let last_active = port_forward_service.last_active().names()?;
-  let running = port_forward_service.get_running_services()?;
-
   let mut reconnected = Vec::new();
+  let mut failures = Vec::new();
 
   for name in last_active {
-    if running.contains(&name) {
-      continue;
-    }
     match port_forward_service
-      .start_port_forward_by_key(kubectl_service, &name)
+      .restart_port_forward_by_key(kubectl_service, &name)
       .await
     {
       Ok(_) => reconnected.push(name),
-      Err(e) => log::warn!("Failed to reconnect {}: {}", name, e),
+      Err(error) => {
+        log::warn!("Failed to reconnect {}: {}", name, error);
+        failures.push(format!("{}: {}", name, error));
+      }
     }
   }
 
-  Ok(reconnected)
+  if failures.is_empty() {
+    Ok(reconnected)
+  } else {
+    Err(AppError::PortForward(format!(
+      "failed to reconnect {}",
+      failures.join("; ")
+    )))
+  }
 }
