@@ -76,9 +76,8 @@ mod tests {
   use clap::Parser;
 
   #[test]
-  fn parses_single_port_forward_reconnect_command() {
-    let cli = Cli::try_parse_from(["ekpfctl", "pf", "db gp", "reconnect"])
-      .expect("port-forward reconnect command should parse");
+  fn parses_single_port_forward_reconnect_command() -> Result<(), clap::Error> {
+    let cli = Cli::try_parse_from(["ekpfctl", "pf", "db gp", "reconnect"])?;
 
     assert!(matches!(
       cli.command,
@@ -87,5 +86,6 @@ mod tests {
         command: PortForwardCommand::Reconnect
       } if name == "db gp"
     ));
+    Ok(())
   }
 }

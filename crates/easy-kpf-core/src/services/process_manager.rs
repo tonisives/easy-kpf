@@ -284,6 +284,7 @@ impl Default for ProcessManager {
 #[cfg(test)]
 mod tests {
   use super::ProcessManager;
+  use crate::error::AppError;
   use crate::types::{ForwardType, PortForwardConfig};
 
   fn config(name: &str) -> PortForwardConfig {
@@ -299,45 +300,27 @@ mod tests {
   }
 
   #[test]
-  fn conditional_remove_does_not_remove_replacement_process() {
+  fn conditional_remove_does_not_remove_replacement_process() -> Result<(), AppError> {
     let manager = ProcessManager::new();
-    manager
-      .add_process("database".to_string(), 100, config("database"))
-      .expect("initial process should be added");
-    manager
-      .add_process("database".to_string(), 200, config("database"))
-      .expect("replacement process should be added");
+    manager.add_process("database".to_string(), 100, config("database"))?;
+    manager.add_process("database".to_string(), 200, config("database"))?;
 
-    let removed = manager
-      .remove_process_if_pid("database", 100)
-      .expect("conditional removal should succeed");
+    let removed = manager.remove_process_if_pid("database", 100)?;
 
     assert!(!removed);
-    assert_eq!(
-      manager
-        .get_process_pid("database")
-        .expect("process lookup should succeed"),
-      Some(200)
-    );
+    assert_eq!(manager.get_process_pid("database")?, Some(200));
+    Ok(())
   }
 
   #[test]
-  fn conditional_remove_removes_matching_process() {
+  fn conditional_remove_removes_matching_process() -> Result<(), AppError> {
     let manager = ProcessManager::new();
-    manager
-      .add_process("database".to_string(), 100, config("database"))
-      .expect("process should be added");
+    manager.add_process("database".to_string(), 100, config("database"))?;
 
-    let removed = manager
-      .remove_process_if_pid("database", 100)
-      .expect("conditional removal should succeed");
+    let removed = manager.remove_process_if_pid("database", 100)?;
 
     assert!(removed);
-    assert_eq!(
-      manager
-        .get_process_pid("database")
-        .expect("process lookup should succeed"),
-      None
-    );
+    assert_eq!(manager.get_process_pid("database")?, None);
+    Ok(())
   }
 }
