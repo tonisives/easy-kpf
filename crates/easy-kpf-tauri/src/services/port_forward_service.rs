@@ -257,14 +257,18 @@ impl PortForwardService {
             let fatal = is_fatal_forward_error(&error_text);
             if !unhealthy && fatal {
               unhealthy = true;
-              let _ = process_manager.remove_process_if_pid(&service_name, pid);
+              let was_managed = process_manager
+                .remove_process_if_pid(&service_name, pid)
+                .unwrap_or(false);
               let _ = ProcessManager::kill_process(pid);
-              schedule_recovery(
-                app_handle.clone(),
-                recovery.clone(),
-                service_name.clone(),
-                error_text.clone(),
-              );
+              if was_managed {
+                schedule_recovery(
+                  app_handle.clone(),
+                  recovery.clone(),
+                  service_name.clone(),
+                  error_text.clone(),
+                );
+              }
             }
             // Emit error event to frontend
             let _ = app_handle.emit(
@@ -280,14 +284,18 @@ impl PortForwardService {
             log::error!("[{}] Process error: {}", service_name, err);
             if !unhealthy {
               unhealthy = true;
-              let _ = process_manager.remove_process_if_pid(&service_name, pid);
+              let was_managed = process_manager
+                .remove_process_if_pid(&service_name, pid)
+                .unwrap_or(false);
               let _ = ProcessManager::kill_process(pid);
-              schedule_recovery(
-                app_handle.clone(),
-                recovery.clone(),
-                service_name.clone(),
-                format!("Process error: {}", err),
-              );
+              if was_managed {
+                schedule_recovery(
+                  app_handle.clone(),
+                  recovery.clone(),
+                  service_name.clone(),
+                  format!("Process error: {}", err),
+                );
+              }
             }
             // Emit error event to frontend
             let _ = app_handle.emit(
@@ -387,14 +395,18 @@ impl PortForwardService {
             let fatal = is_fatal_forward_error(&error_text);
             if !unhealthy && fatal {
               unhealthy = true;
-              let _ = process_manager.remove_process_if_pid(&service_name, pid);
+              let was_managed = process_manager
+                .remove_process_if_pid(&service_name, pid)
+                .unwrap_or(false);
               let _ = ProcessManager::kill_process(pid);
-              schedule_recovery(
-                app_handle.clone(),
-                recovery.clone(),
-                service_name.clone(),
-                error_text.clone(),
-              );
+              if was_managed {
+                schedule_recovery(
+                  app_handle.clone(),
+                  recovery.clone(),
+                  service_name.clone(),
+                  error_text.clone(),
+                );
+              }
             }
             // Emit error event to frontend
             let _ = app_handle.emit(
@@ -410,14 +422,18 @@ impl PortForwardService {
             log::error!("[{}] Process error: {}", service_name, err);
             if !unhealthy {
               unhealthy = true;
-              let _ = process_manager.remove_process_if_pid(&service_name, pid);
+              let was_managed = process_manager
+                .remove_process_if_pid(&service_name, pid)
+                .unwrap_or(false);
               let _ = ProcessManager::kill_process(pid);
-              schedule_recovery(
-                app_handle.clone(),
-                recovery.clone(),
-                service_name.clone(),
-                format!("Process error: {}", err),
-              );
+              if was_managed {
+                schedule_recovery(
+                  app_handle.clone(),
+                  recovery.clone(),
+                  service_name.clone(),
+                  format!("Process error: {}", err),
+                );
+              }
             }
             // Emit error event to frontend
             let _ = app_handle.emit(
