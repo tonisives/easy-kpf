@@ -1,3 +1,4 @@
+use crate::recovery::{HookContext, HookEvent, RecoveryCoordinator, RecoveryTicket};
 use easy_kpf_core::error::{AppError, Result};
 use easy_kpf_core::services::{
   ConfigCache, ConfigService, InterfaceManager, KubectlCommandBuilder, LastActiveSet,
@@ -6,7 +7,7 @@ use easy_kpf_core::services::{
 use easy_kpf_core::types::{ForwardType, PortForwardConfig};
 use serde::Serialize;
 use std::time::Duration;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 use super::KubectlOperations;
 use tauri_plugin_shell::ShellExt;
@@ -18,6 +19,12 @@ pub struct ServiceErrorEvent {
   pub fatal: bool,
 }
 
+#[derive(Clone, Serialize)]
+struct ServiceRecoveredEvent {
+  service_name: String,
+  attempt: u32,
+}
+
 pub struct PortForwardService {
   app_handle: tauri::AppHandle,
   config_cache: ConfigCache,
@@ -26,6 +33,7 @@ pub struct PortForwardService {
   last_active: LastActiveSet,
   interface_manager: SystemInterfaceManager,
   process_detector: ProcessDetector,
+  recovery: RecoveryCoordinator,
 }
 
 impl PortForwardService {
@@ -43,6 +51,7 @@ impl PortForwardService {
       last_active,
       interface_manager: SystemInterfaceManager,
       process_detector: ProcessDetector::new(),
+      recovery: RecoveryCoordinator::default(),
     }
   }
 
@@ -95,6 +104,7 @@ impl PortForwardService {
       ))
     })?;
 
+    self.recovery.cancel(service_key)?;
     self
       .start_port_forward_generic(kubectl_service, config)
       .await
@@ -125,6 +135,17 @@ impl PortForwardService {
   }
 
   pub async fn restart_port_forward_by_key<K: KubectlOperations>(
+    &self,
+    kubectl_service: &K,
+    service_key: &str,
+  ) -> Result<String> {
+    self.recovery.cancel(service_key)?;
+    self
+      .restart_port_forward_after_failure(kubectl_service, service_key)
+      .await
+  }
+
+  pub(crate) async fn restart_port_forward_after_failure<K: KubectlOperations>(
     &self,
     kubectl_service: &K,
     service_key: &str,
@@ -175,6 +196,7 @@ impl PortForwardService {
     }
   }
 
+  #[allow(clippy::too_many_lines)]
   async fn execute_kubectl_port_forward(&self, config: &PortForwardConfig) -> Result<String> {
     // Create local interface if specified and doesn't exist
     if let Some(ref interface) = config.local_interface {
@@ -219,6 +241,7 @@ impl PortForwardService {
     let service_name = config.name.clone();
     let app_handle = self.app_handle.clone();
     let process_manager = self.process_manager.clone();
+    let recovery = self.recovery.clone();
     tauri::async_runtime::spawn(async move {
       use tauri_plugin_shell::process::CommandEvent;
       let mut rx = rx;
@@ -236,6 +259,12 @@ impl PortForwardService {
               unhealthy = true;
               let _ = process_manager.remove_process_if_pid(&service_name, pid);
               let _ = ProcessManager::kill_process(pid);
+              schedule_recovery(
+                app_handle.clone(),
+                recovery.clone(),
+                service_name.clone(),
+                error_text.clone(),
+              );
             }
             // Emit error event to frontend
             let _ = app_handle.emit(
@@ -253,6 +282,12 @@ impl PortForwardService {
               unhealthy = true;
               let _ = process_manager.remove_process_if_pid(&service_name, pid);
               let _ = ProcessManager::kill_process(pid);
+              schedule_recovery(
+                app_handle.clone(),
+                recovery.clone(),
+                service_name.clone(),
+                format!("Process error: {}", err),
+              );
             }
             // Emit error event to frontend
             let _ = app_handle.emit(
@@ -274,6 +309,12 @@ impl PortForwardService {
               .remove_process_if_pid(&service_name, pid)
               .unwrap_or(false);
             if was_managed {
+              schedule_recovery(
+                app_handle.clone(),
+                recovery.clone(),
+                service_name.clone(),
+                "Port forward stopped unexpectedly".to_string(),
+              );
               let _ = app_handle.emit(
                 "service-error",
                 ServiceErrorEvent {
@@ -295,6 +336,7 @@ impl PortForwardService {
     ))
   }
 
+  #[allow(clippy::too_many_lines)]
   async fn execute_ssh_port_forward(&self, config: &PortForwardConfig) -> Result<String> {
     // Create local interface if specified and doesn't exist
     if let Some(ref interface) = config.local_interface {
@@ -329,6 +371,7 @@ impl PortForwardService {
     let service_name = config.name.clone();
     let app_handle = self.app_handle.clone();
     let process_manager = self.process_manager.clone();
+    let recovery = self.recovery.clone();
     tauri::async_runtime::spawn(async move {
       use tauri_plugin_shell::process::CommandEvent;
       let mut rx = rx;
@@ -346,6 +389,12 @@ impl PortForwardService {
               unhealthy = true;
               let _ = process_manager.remove_process_if_pid(&service_name, pid);
               let _ = ProcessManager::kill_process(pid);
+              schedule_recovery(
+                app_handle.clone(),
+                recovery.clone(),
+                service_name.clone(),
+                error_text.clone(),
+              );
             }
             // Emit error event to frontend
             let _ = app_handle.emit(
@@ -363,6 +412,12 @@ impl PortForwardService {
               unhealthy = true;
               let _ = process_manager.remove_process_if_pid(&service_name, pid);
               let _ = ProcessManager::kill_process(pid);
+              schedule_recovery(
+                app_handle.clone(),
+                recovery.clone(),
+                service_name.clone(),
+                format!("Process error: {}", err),
+              );
             }
             // Emit error event to frontend
             let _ = app_handle.emit(
@@ -384,6 +439,12 @@ impl PortForwardService {
               .remove_process_if_pid(&service_name, pid)
               .unwrap_or(false);
             if was_managed {
+              schedule_recovery(
+                app_handle.clone(),
+                recovery.clone(),
+                service_name.clone(),
+                "Port forward stopped unexpectedly".to_string(),
+              );
               let _ = app_handle.emit(
                 "service-error",
                 ServiceErrorEvent {
@@ -406,12 +467,15 @@ impl PortForwardService {
   }
 
   pub fn stop_port_forward(&self, service_name: &str) -> Result<String> {
-    let pid = self
-      .process_manager
-      .remove_process(service_name)?
-      .ok_or_else(|| {
-        AppError::NotFound(format!("{} port forwarding is not running", service_name))
-      })?;
+    let recovery_was_active = self.recovery.cancel(service_name)?;
+    let pid = self.process_manager.remove_process(service_name)?;
+    if pid.is_none() && recovery_was_active {
+      self.last_active.remove(service_name)?;
+      return Ok(format!("Stopped {} pending reconnect", service_name));
+    }
+    let pid = pid.ok_or_else(|| {
+      AppError::NotFound(format!("{} port forwarding is not running", service_name))
+    })?;
 
     self.last_active.remove(service_name)?;
 
@@ -433,6 +497,7 @@ impl PortForwardService {
   }
 
   pub fn cleanup_all_port_forwards(&self) -> Result<()> {
+    self.recovery.cancel_all()?;
     let pids = self.process_manager.cleanup_all()?;
 
     for pid in pids {
@@ -456,6 +521,12 @@ impl PortForwardService {
         );
         // Clean up dead process
         let _ = self.process_manager.remove_process(&service_name);
+        schedule_recovery(
+          self.app_handle.clone(),
+          self.recovery.clone(),
+          service_name.clone(),
+          "Port forward process is no longer running".to_string(),
+        );
       }
       results.push((service_name, is_actually_running));
     }
@@ -510,6 +581,194 @@ impl PortForwardService {
 
     Ok(synced_services)
   }
+}
+
+fn schedule_recovery(
+  app_handle: tauri::AppHandle,
+  recovery: RecoveryCoordinator,
+  service_name: String,
+  error: String,
+) {
+  tauri::async_runtime::spawn(async move {
+    if let Err(recovery_error) =
+      recover_port_forward(app_handle, recovery, service_name.clone(), error).await
+    {
+      log::error!(
+        "[{}] Automatic reconnect failed: {}",
+        service_name,
+        recovery_error
+      );
+    }
+  });
+}
+
+#[allow(clippy::too_many_lines)]
+async fn recover_port_forward(
+  app_handle: tauri::AppHandle,
+  recovery: RecoveryCoordinator,
+  service_name: String,
+  initial_error: String,
+) -> Result<()> {
+  let port_forward_service = app_handle.state::<PortForwardService>();
+  let recovery_settings = port_forward_service
+    .get_configs()?
+    .into_iter()
+    .find(|config| config.name == service_name)
+    .and_then(|config| config.recovery)
+    .unwrap_or_default();
+  if !recovery_settings.reconnect.enabled {
+    log::info!("[{}] Automatic reconnect is disabled", service_name);
+    return Ok(());
+  }
+
+  let Some(ticket) = recovery.begin(&service_name)? else {
+    log::debug!("[{}] Recovery is already in progress", service_name);
+    return Ok(());
+  };
+
+  let mut error = initial_error;
+  let mut first_attempt = true;
+  loop {
+    let Some(attempt) = recovery.next_attempt(&ticket, &recovery_settings.reconnect)? else {
+      recovery.finish(&ticket)?;
+      let max_attempts = recovery_settings.reconnect.max_attempts;
+      if max_attempts > 0 {
+        let message = format!(
+          "Automatic reconnect stopped after {} attempts",
+          max_attempts
+        );
+        log::error!("[{}] {}", service_name, message);
+        let _ = app_handle.emit(
+          "service-error",
+          ServiceErrorEvent {
+            service_name,
+            error: message,
+            fatal: true,
+          },
+        );
+      }
+      return Ok(());
+    };
+
+    let context = HookContext {
+      service_name: &service_name,
+      error: &error,
+      attempt: attempt.number,
+    };
+    if first_attempt {
+      recovery
+        .run_hooks(
+          HookEvent::Failure,
+          &recovery_settings.hooks.on_failure,
+          &context,
+        )
+        .await;
+      first_attempt = false;
+    }
+
+    log::warn!(
+      "[{}] Reconnecting in {:?} (attempt {})",
+      service_name,
+      attempt.delay,
+      attempt.number
+    );
+    tokio::time::sleep(attempt.delay).await;
+    if !recovery.is_active(&ticket)? {
+      return Ok(());
+    }
+
+    recovery
+      .run_hooks(
+        HookEvent::BeforeReconnect,
+        &recovery_settings.hooks.before_reconnect,
+        &context,
+      )
+      .await;
+    if !recovery.is_active(&ticket)? {
+      return Ok(());
+    }
+
+    let kubectl_service = app_handle.state::<super::KubectlService>();
+    match port_forward_service
+      .restart_port_forward_after_failure(kubectl_service.inner(), &service_name)
+      .await
+    {
+      Ok(_) => {
+        recovery.finish(&ticket)?;
+        schedule_recovered_hook(
+          app_handle,
+          recovery,
+          ticket,
+          service_name,
+          error,
+          attempt.number,
+          recovery_settings.reconnect.stable_after_seconds,
+          recovery_settings.hooks.on_recovered,
+        );
+        return Ok(());
+      }
+      Err(reconnect_error) => {
+        error = reconnect_error.to_string();
+        log::warn!(
+          "[{}] Reconnect attempt {} failed: {}",
+          service_name,
+          attempt.number,
+          error
+        );
+      }
+    }
+  }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn schedule_recovered_hook(
+  app_handle: tauri::AppHandle,
+  recovery: RecoveryCoordinator,
+  ticket: RecoveryTicket,
+  service_name: String,
+  error: String,
+  attempt: u32,
+  stable_after_seconds: u64,
+  hooks: Vec<easy_kpf_core::types::HookCommand>,
+) {
+  tauri::async_runtime::spawn(async move {
+    tokio::time::sleep(Duration::from_secs(stable_after_seconds)).await;
+    match recovery.mark_stable(&ticket) {
+      Ok(true) => {
+        log::info!(
+          "[{}] Port forward remained stable for {} seconds",
+          service_name,
+          stable_after_seconds
+        );
+        recovery
+          .run_hooks(
+            HookEvent::Recovered,
+            &hooks,
+            &HookContext {
+              service_name: &service_name,
+              error: &error,
+              attempt,
+            },
+          )
+          .await;
+        let _ = app_handle.emit(
+          "service-recovered",
+          ServiceRecoveredEvent {
+            service_name,
+            attempt,
+          },
+        );
+      }
+      Ok(false) => {}
+      Err(recovery_error) => {
+        log::warn!(
+          "[{}] Could not mark port forward recovered: {}",
+          service_name,
+          recovery_error
+        );
+      }
+    }
+  });
 }
 
 fn is_fatal_forward_error(error: &str) -> bool {

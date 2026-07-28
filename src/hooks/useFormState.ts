@@ -1,4 +1,4 @@
-import { PortForwardConfig } from "./hooks"
+import { PortForwardConfig, RecoveryHook, RecoverySettings } from "./hooks"
 
 export let deriveConfigName = (
   forwardType: "Kubectl" | "Ssh",
@@ -26,12 +26,62 @@ type FormStateProps = {
   } | null
 }
 
+let formInteger = (formData: FormData, name: string, fallback: number, minimum = 0) => {
+  let parsed = Number(formData.get(name))
+  return Number.isFinite(parsed) ? Math.max(minimum, Math.trunc(parsed)) : fallback
+}
+
+let parseRecovery = (
+  formData: FormData,
+  existing?: RecoverySettings,
+): RecoverySettings | undefined => {
+  if (!formData.has("recoveryOverride")) return undefined
+
+  let hookType: RecoveryHook["type"] =
+    formData.get("recoveryHookType") === "ssh" ? "ssh" : "command"
+  let command = String(formData.get("recoveryHookCommand") || "").trim()
+  let hook: RecoveryHook | undefined = command
+    ? {
+        type: hookType,
+        command,
+        args: String(formData.get("recoveryHookArgs") || "")
+          .split("\n")
+          .map((value) => value.trim())
+          .filter(Boolean),
+        ssh_host: hookType === "ssh"
+          ? String(formData.get("recoveryHookSshHost") || "").trim() || undefined
+          : undefined,
+        timeout_seconds: formInteger(formData, "recoveryHookTimeoutSeconds", 30, 1),
+        cooldown_seconds: formInteger(formData, "recoveryHookCooldownSeconds", 30),
+      }
+    : undefined
+
+  return {
+    reconnect: {
+      enabled: formData.has("recoveryEnabled"),
+      initial_delay_ms: formInteger(formData, "recoveryInitialDelayMs", 1000),
+      max_delay_ms: formInteger(formData, "recoveryMaxDelayMs", 30000),
+      stable_after_seconds: formInteger(formData, "recoveryStableAfterSeconds", 30),
+      max_attempts: formInteger(formData, "recoveryMaxAttempts", 0),
+    },
+    hooks: {
+      on_failure: existing?.hooks.on_failure || [],
+      before_reconnect: [
+        ...(hook ? [hook] : []),
+        ...(existing?.hooks.before_reconnect.slice(1) || []),
+      ],
+      on_recovered: existing?.hooks.on_recovered || [],
+    },
+  }
+}
+
 export let useFormState = ({ onAdd, onUpdate, onClose, editingConfig }: FormStateProps) => {
   let handleSubmit = (selectedContext: string, selectedNamespace: string, selectedService: string) => (e: React.FormEvent) => {
     e.preventDefault()
     let formData = new FormData(e.target as HTMLFormElement)
     let forwardType = formData.get("forwardType") as "Kubectl" | "Ssh"
     let providedName = formData.get("name") as string
+    let recovery = parseRecovery(formData, editingConfig?.config.recovery)
 
     let config: PortForwardConfig
 
@@ -51,6 +101,7 @@ export let useFormState = ({ onAdd, onUpdate, onClose, editingConfig }: FormStat
         ports: ports,
         local_interface: localInterface || undefined,
         forward_type: "Ssh",
+        recovery,
       }
     } else {
       let portsString = formData.get("ports") as string
@@ -70,6 +121,7 @@ export let useFormState = ({ onAdd, onUpdate, onClose, editingConfig }: FormStat
         ports: ports,
         local_interface: localInterface || undefined,
         forward_type: "Kubectl",
+        recovery,
       }
     }
 

@@ -127,6 +127,87 @@ configs:
 
 Configuration files are automatically created with defaults on first run.
 
+### Automatic reconnect and lifecycle hooks
+
+EasyKpf automatically replaces a failed forward with exponential backoff. A
+forward is considered recovered after the replacement process remains alive for
+the configured stability period. Explicitly stopping a forward cancels pending
+reconnect attempts.
+
+Forwards use built-in reconnect defaults unless their entry in
+`port-forwards.yaml` contains a `recovery` override. This lets unrelated
+forwards use different retry policies and repair different upstream
+dependencies:
+
+```yaml
+configs:
+  - name: db gp
+    context: tgs
+    namespace: infra
+    service: postgres-gp-1-cluster-rw
+    ports: ["8101:5432"]
+    recovery:
+      reconnect:
+        enabled: true
+        initial_delay_ms: 1000
+        max_delay_ms: 30000
+        stable_after_seconds: 30
+        max_attempts: 0
+      hooks:
+        on_failure: []
+        before_reconnect:
+          - type: command
+            command: /Users/me/bin/recover-kubernetes-tunnel
+            args: []
+            timeout_seconds: 30
+            cooldown_seconds: 30
+        on_recovered: []
+
+  - name: demand map worker
+    context: tgs
+    namespace: jobs
+    service: demand-map-worker
+    ports: ["8102:8080"]
+    recovery:
+      reconnect:
+        enabled: true
+      hooks:
+        before_reconnect:
+          - type: ssh
+            ssh_host: k3s-host
+            command: sudo systemctl restart demand-map-worker
+            args: []
+```
+
+The built-in defaults retry indefinitely (`max_attempts: 0`), starting after
+one second and backing off to 30 seconds. Local hooks are executed directly as
+a command and argument list; EasyKpf does not evaluate them through a shell.
+SSH hooks run the configured command on their forward's `ssh_host` in batch
+mode. Cooldowns deduplicate identical hooks, which prevents several forwards
+that share one upstream tunnel from restarting it repeatedly.
+
+Local hook processes receive these environment variables:
+
+- `EASY_KPF_EVENT`: `failure`, `before_reconnect`, or `recovered`
+- `EASY_KPF_SERVICE`: the configured forward name
+- `EASY_KPF_ERROR`: the error that initiated or most recently blocked recovery
+- `EASY_KPF_ATTEMPT`: the current reconnect attempt number
+
+`on_failure` runs once when a managed forward fails. `before_reconnect` runs
+before each reconnect attempt. `on_recovered` runs after the replacement
+survives `stable_after_seconds`.
+
+The Add/Edit Port Forward form can enable a custom policy and configure its
+first local or SSH `before_reconnect` hook. Additional lifecycle hooks can be
+added directly to YAML and are preserved when the UI saves that forward.
+
+A macOS recovery script for a launch agent can be as small as:
+
+```sh
+#!/bin/sh
+exec /bin/launchctl kickstart -k "gui/$(id -u)/com.example.kubernetes-tunnel"
+```
+
 ## Technology
 
 - Frontend: React + TypeScript + Vite
