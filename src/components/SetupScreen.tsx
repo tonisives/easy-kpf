@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, type MouseEvent } from "react"
 import { invoke } from "@tauri-apps/api/core"
 
 type SetupScreenProps = {
@@ -74,6 +74,12 @@ let SetupScreen = ({ onSetupComplete, onCancel, isDialog }: SetupScreenProps) =>
       onSetupComplete()
     } catch (err) {
       setError(`Failed to save kubectl path: ${err}`)
+    }
+  }
+
+  let handleBackdropClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      onCancel?.()
     }
   }
 
@@ -223,7 +229,7 @@ let SetupScreen = ({ onSetupComplete, onCancel, isDialog }: SetupScreenProps) =>
 
   if (isDialog) {
     return (
-      <div className="settings-modal">{content}</div>
+      <div className="settings-modal" onClick={handleBackdropClick}>{content}</div>
     )
   }
 

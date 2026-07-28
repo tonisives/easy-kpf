@@ -850,9 +850,45 @@ p {
   color: var(--accent);
 }
 
+.service-settings-actions .logs-button {
+  color: var(--accent);
+}
+
 .service-settings-actions .delete-button {
   margin-right: auto;
   color: var(--red);
+}
+
+.service-logs {
+  max-height: min(360px, calc(100vh - 180px));
+  overflow: auto;
+  margin-bottom: 16px;
+  padding: 9px;
+  border: 1px solid var(--separator-soft);
+  border-radius: 7px;
+  background: var(--window);
+  color: var(--secondary-label);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  user-select: text;
+}
+
+.service-log-line {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.service-log-line + .service-log-line {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--separator-soft);
+}
+
+.service-logs-empty {
+  margin-bottom: 16px;
+  color: var(--secondary-label);
+  font-size: 12px;
 }
 
 .setup-screen {

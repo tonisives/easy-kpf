@@ -28,6 +28,8 @@ enum Command {
   Status,
   #[command(about = "Bring the EasyKpf window to focus")]
   Show,
+  #[command(about = "Print the ekpfctl version")]
+  Version,
   #[command(about = "Print shell completion script to stdout")]
   Completions {
     #[arg(value_enum)]
@@ -59,6 +61,10 @@ async fn main() {
     Command::List => Request::List,
     Command::Status => Request::Status,
     Command::Show => Request::Show,
+    Command::Version => {
+      println!("{}", env!("CARGO_PKG_VERSION"));
+      return;
+    }
     Command::Completions { shell } => {
       let mut cmd = Cli::command();
       let bin_name = cmd.get_name().to_string();
@@ -86,6 +92,14 @@ mod tests {
         command: PortForwardCommand::Reconnect
       } if name == "db gp"
     ));
+    Ok(())
+  }
+
+  #[test]
+  fn parses_version_command() -> Result<(), clap::Error> {
+    let cli = Cli::try_parse_from(["ekpfctl", "version"])?;
+
+    assert!(matches!(cli.command, Command::Version));
     Ok(())
   }
 }

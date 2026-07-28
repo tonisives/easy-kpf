@@ -78,7 +78,7 @@ let ServiceCard = ({
         </button>
       </div>
 
-      {errors && errors.length > 0 && (
+      {!isRunning && errors && errors.length > 0 && (
         <div className="service-error">
           <div className="service-error-text">
             {errors.map((err, index) => (

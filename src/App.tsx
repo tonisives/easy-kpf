@@ -170,6 +170,12 @@ function App() {
     })
   }
 
+  let handleClearActiveServiceErrors = () => {
+    if (activeServiceSettings) {
+      clearServiceError(activeServiceSettings)
+    }
+  }
+
   let sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -422,6 +428,7 @@ function App() {
 
       <ServiceSettings
         config={configs.find((c) => c.name === activeServiceSettings) || null}
+        errors={services.find((service) => service.name === activeServiceSettings)?.errors}
         onEdit={(config, index) => {
           setFocusRecovery(false)
           setEditingConfig({ config, index })
@@ -433,6 +440,7 @@ function App() {
           setShowConfigForm(true)
         }}
         onDelete={removeConfig}
+        onClearErrors={handleClearActiveServiceErrors}
         onClose={() => setActiveServiceSettings(null)}
         configs={configs}
         recoveryScopes={recoveryScopes}
