@@ -33,6 +33,26 @@ let ServiceSettings = ({ config, onEdit, onDelete, onClose, configs }: ServiceSe
           <p>
             <strong>Ports</strong><span>{config.ports.join(", ")}</span>
           </p>
+          <p>
+            <strong>Recovery</strong>
+            <span>
+              {config.recovery
+                ? config.recovery.reconnect.enabled
+                  ? "Custom, enabled"
+                  : "Custom, disabled"
+                : "Built-in defaults"}
+            </span>
+          </p>
+          {config.recovery?.hooks.before_reconnect[0] && (
+            <p>
+              <strong>Recovery Hook</strong>
+              <span>
+                {config.recovery.hooks.before_reconnect[0].type === "ssh"
+                  ? `SSH ${config.recovery.hooks.before_reconnect[0].ssh_host || ""}`
+                  : config.recovery.hooks.before_reconnect[0].command}
+              </span>
+            </p>
+          )}
         </div>
         <div className="service-settings-actions">
           <button

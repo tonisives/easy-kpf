@@ -373,6 +373,7 @@ impl App {
       ports: vec![],
       local_interface: None,
       forward_type: ForwardType::Kubectl,
+      recovery: None,
     };
     self.edit_original_config = Some(new_config.clone()); // Save original for change detection
     self.edit_config = Some(new_config);

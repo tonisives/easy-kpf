@@ -209,6 +209,7 @@ mod tests {
       ports: vec!["8080:80".to_string()],
       local_interface: None,
       forward_type,
+      recovery: None,
     }
   }
 

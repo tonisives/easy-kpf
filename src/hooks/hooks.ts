@@ -10,6 +10,11 @@ type ServiceErrorEvent = {
   fatal?: boolean
 }
 
+type ServiceRecoveredEvent = {
+  service_name: string
+  attempt: number
+}
+
 export type ServiceStatus = {
   name: string
   running: boolean
@@ -17,6 +22,30 @@ export type ServiceStatus = {
 }
 
 export type ForwardType = "Kubectl" | "Ssh"
+
+export type RecoveryHook = {
+  type: "command" | "ssh"
+  command: string
+  args: string[]
+  ssh_host?: string
+  timeout_seconds: number
+  cooldown_seconds: number
+}
+
+export type RecoverySettings = {
+  reconnect: {
+    enabled: boolean
+    initial_delay_ms: number
+    max_delay_ms: number
+    stable_after_seconds: number
+    max_attempts: number
+  }
+  hooks: {
+    on_failure: RecoveryHook[]
+    before_reconnect: RecoveryHook[]
+    on_recovered: RecoveryHook[]
+  }
+}
 
 export type PortForwardConfig = {
   name: string
@@ -26,6 +55,7 @@ export type PortForwardConfig = {
   ports: string[]
   local_interface?: string
   forward_type: ForwardType
+  recovery?: RecoverySettings
 }
 
 export let useConfigs = (
@@ -121,10 +151,19 @@ export let useConfigs = (
         ),
       )
     })
+    let unlistenRecoveredPromise = listen<ServiceRecoveredEvent>("service-recovered", (event) => {
+      let { service_name } = event.payload
+      setServices((prev) =>
+        prev.map((service) =>
+          service.name === service_name ? { ...service, running: true } : service,
+        ),
+      )
+    })
 
     return () => {
       clearInterval(verificationInterval)
       unlistenPromise.then((unlisten) => unlisten())
+      unlistenRecoveredPromise.then((unlisten) => unlisten())
     }
   }, [])
 

@@ -3,6 +3,7 @@ use tauri::Manager;
 mod handlers;
 mod ipc_server;
 mod reconnect;
+mod recovery;
 mod services;
 mod utils;
 pub mod window;

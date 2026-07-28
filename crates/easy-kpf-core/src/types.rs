@@ -12,6 +12,8 @@ pub struct PortForwardConfig {
   pub local_interface: Option<String>,
   #[serde(default)]
   pub forward_type: ForwardType,
+  #[serde(default)]
+  pub recovery: Option<RecoverySettings>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -25,6 +27,97 @@ pub enum ForwardType {
 pub struct AppConfig {
   pub kubectl_path: Option<String>,
   pub kubeconfig_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReconnectPolicy {
+  #[serde(default = "default_reconnect_enabled")]
+  pub enabled: bool,
+  #[serde(default = "default_initial_delay_ms")]
+  pub initial_delay_ms: u64,
+  #[serde(default = "default_max_delay_ms")]
+  pub max_delay_ms: u64,
+  #[serde(default = "default_stable_after_seconds")]
+  pub stable_after_seconds: u64,
+  #[serde(default)]
+  pub max_attempts: u32,
+}
+
+impl Default for ReconnectPolicy {
+  fn default() -> Self {
+    Self {
+      enabled: default_reconnect_enabled(),
+      initial_delay_ms: default_initial_delay_ms(),
+      max_delay_ms: default_max_delay_ms(),
+      stable_after_seconds: default_stable_after_seconds(),
+      max_attempts: 0,
+    }
+  }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PortForwardHooks {
+  #[serde(default)]
+  pub on_failure: Vec<HookCommand>,
+  #[serde(default)]
+  pub before_reconnect: Vec<HookCommand>,
+  #[serde(default)]
+  pub on_recovered: Vec<HookCommand>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HookCommand {
+  #[serde(rename = "type", default)]
+  pub kind: HookType,
+  pub command: String,
+  #[serde(default)]
+  pub args: Vec<String>,
+  #[serde(default)]
+  pub ssh_host: Option<String>,
+  #[serde(default = "default_hook_timeout_seconds")]
+  pub timeout_seconds: u64,
+  #[serde(default = "default_hook_cooldown_seconds")]
+  pub cooldown_seconds: u64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum HookType {
+  #[default]
+  Command,
+  Ssh,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RecoverySettings {
+  #[serde(default)]
+  pub reconnect: ReconnectPolicy,
+  #[serde(default)]
+  pub hooks: PortForwardHooks,
+}
+
+const fn default_reconnect_enabled() -> bool {
+  true
+}
+
+const fn default_initial_delay_ms() -> u64 {
+  1_000
+}
+
+const fn default_max_delay_ms() -> u64 {
+  30_000
+}
+
+const fn default_stable_after_seconds() -> u64 {
+  30
+}
+
+const fn default_hook_timeout_seconds() -> u64 {
+  30
+}
+
+const fn default_hook_cooldown_seconds() -> u64 {
+  30
 }
 
 #[derive(Debug, Clone)]
@@ -68,4 +161,56 @@ pub struct PortForwardConfigs {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ProcessManagerState {
   pub processes: std::collections::HashMap<String, SerializableProcessInfo>,
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{HookType, PortForwardConfigs, RecoverySettings};
+
+  #[test]
+  fn recovery_settings_round_trip_as_yaml() -> Result<(), serde_yaml::Error> {
+    let settings = RecoverySettings {
+      reconnect: Default::default(),
+      hooks: Default::default(),
+    };
+
+    let yaml = serde_yaml::to_string(&settings)?;
+    let restored: RecoverySettings = serde_yaml::from_str(&yaml)?;
+
+    assert!(restored.reconnect.enabled);
+    assert!(restored.hooks.before_reconnect.is_empty());
+    Ok(())
+  }
+
+  #[test]
+  fn port_forward_can_override_recovery_with_ssh_hook() -> Result<(), Box<dyn std::error::Error>> {
+    let configs: PortForwardConfigs = serde_yaml::from_str(
+      r#"
+configs:
+  - name: db gp
+    context: tgs
+    namespace: infra
+    service: postgres
+    ports: ["8101:5432"]
+    recovery:
+      reconnect:
+        enabled: true
+      hooks:
+        before_reconnect:
+          - type: ssh
+            ssh_host: k3s-host
+            command: sudo systemctl restart tunnel
+"#,
+    )?;
+    let recovery = configs.configs[0]
+      .recovery
+      .as_ref()
+      .ok_or_else(|| std::io::Error::other("missing recovery override"))?;
+    let hook = &recovery.hooks.before_reconnect[0];
+
+    assert_eq!(hook.kind, HookType::Ssh);
+    assert_eq!(hook.ssh_host.as_deref(), Some("k3s-host"));
+    assert_eq!(hook.command, "sudo systemctl restart tunnel");
+    Ok(())
+  }
 }

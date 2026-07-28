@@ -8,6 +8,7 @@ import { FormActions } from "./FormActions"
 import { NameField } from "./NameField"
 import { KubernetesForm } from "./KubernetesForm"
 import { SshForm } from "./SshForm"
+import { RecoveryForm } from "./RecoveryForm"
 
 type AddConfigFormProps = {
   onAdd: (config: PortForwardConfig) => void
@@ -158,6 +159,8 @@ let AddConfigForm = ({
             name="forwardType"
             value={connectionType === "ssh" ? "Ssh" : "Kubectl"}
           />
+
+          <RecoveryForm recovery={editingConfig?.config.recovery} />
 
           <FormActions isEditing={isEditing} onCancel={handleCancel} />
         </form>

@@ -296,6 +296,7 @@ mod tests {
       ports: vec!["5432".to_string()],
       local_interface: None,
       forward_type: ForwardType::Kubectl,
+      recovery: None,
     }
   }
 
