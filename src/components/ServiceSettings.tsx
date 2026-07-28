@@ -1,4 +1,4 @@
-import { PortForwardConfig } from "../hooks/hooks"
+import { PortForwardConfig, RecoveryScopes } from "../hooks/hooks"
 
 type ServiceSettingsProps = {
   config: PortForwardConfig | null
@@ -7,6 +7,7 @@ type ServiceSettingsProps = {
   onDelete: (configName: string) => void
   onClose: () => void
   configs: PortForwardConfig[]
+  recoveryScopes: RecoveryScopes
 }
 
 let ServiceSettings = ({
@@ -16,6 +17,7 @@ let ServiceSettings = ({
   onDelete,
   onClose,
   configs,
+  recoveryScopes,
 }: ServiceSettingsProps) => {
   if (!config) return null
 
@@ -48,7 +50,12 @@ let ServiceSettings = ({
                 ? config.recovery.reconnect.enabled
                   ? "Custom, enabled"
                   : "Custom, disabled"
-                : "Built-in defaults"}
+                : config.forward_type === "Ssh" && recoveryScopes.ssh_hosts[config.context]
+                  ? "SSH host settings"
+                  : config.forward_type === "Kubectl"
+                    && recoveryScopes.kubernetes_contexts[config.context]
+                    ? "Kubernetes context settings"
+                    : "Built-in defaults"}
             </span>
           </p>
           {config.recovery?.hooks.before_reconnect[0] && (

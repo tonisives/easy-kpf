@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +97,50 @@ pub struct RecoverySettings {
   pub hooks: PortForwardHooks,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RecoveryScopes {
+  #[serde(default)]
+  pub kubernetes_contexts: BTreeMap<String, RecoverySettings>,
+  #[serde(default)]
+  pub ssh_hosts: BTreeMap<String, RecoverySettings>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoveryScopeKind {
+  KubernetesContext,
+  SshHost,
+}
+
+impl RecoveryScopes {
+  pub fn for_config(&self, config: &PortForwardConfig) -> Option<&RecoverySettings> {
+    match config.forward_type {
+      ForwardType::Kubectl => self.kubernetes_contexts.get(&config.context),
+      ForwardType::Ssh => self.ssh_hosts.get(&config.context),
+    }
+  }
+
+  pub fn set(&mut self, kind: RecoveryScopeKind, key: String, recovery: Option<RecoverySettings>) {
+    let scopes = match kind {
+      RecoveryScopeKind::KubernetesContext => &mut self.kubernetes_contexts,
+      RecoveryScopeKind::SshHost => &mut self.ssh_hosts,
+    };
+    if let Some(recovery) = recovery {
+      scopes.insert(key, recovery);
+    } else {
+      scopes.remove(&key);
+    }
+  }
+
+  pub fn resolve(&self, config: &PortForwardConfig) -> RecoverySettings {
+    config
+      .recovery
+      .clone()
+      .or_else(|| self.for_config(config).cloned())
+      .unwrap_or_default()
+  }
+}
+
 const fn default_reconnect_enabled() -> bool {
   true
 }
@@ -153,8 +198,10 @@ impl From<SerializableProcessInfo> for ProcessInfo {
   }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PortForwardConfigs {
+  #[serde(default)]
+  pub recovery: RecoveryScopes,
   pub configs: Vec<PortForwardConfig>,
 }
 
@@ -211,6 +258,83 @@ configs:
     assert_eq!(hook.kind, HookType::Ssh);
     assert_eq!(hook.ssh_host.as_deref(), Some("k3s-host"));
     assert_eq!(hook.command, "sudo systemctl restart tunnel");
+    Ok(())
+  }
+
+  #[test]
+  fn recovery_resolves_forward_then_scope_then_defaults() -> Result<(), Box<dyn std::error::Error>>
+  {
+    let document: PortForwardConfigs = serde_yaml::from_str(
+      r#"
+recovery:
+  kubernetes_contexts:
+    tgs:
+      reconnect:
+        initial_delay_ms: 2000
+  ssh_hosts:
+    job-host:
+      reconnect:
+        initial_delay_ms: 3000
+configs:
+  - name: context forward
+    context: tgs
+    namespace: infra
+    service: svc/db
+    ports: ["8101:5432"]
+  - name: forward override
+    context: tgs
+    namespace: infra
+    service: svc/cache
+    ports: ["6380:6379"]
+    recovery:
+      reconnect:
+        initial_delay_ms: 4000
+  - name: ssh forward
+    context: job-host
+    namespace: default
+    service: job-host
+    ports: ["9000:9000"]
+    forward_type: Ssh
+  - name: built in
+    context: other
+    namespace: default
+    service: svc/other
+    ports: ["8080:80"]
+"#,
+    )?;
+
+    assert_eq!(
+      document
+        .recovery
+        .resolve(&document.configs[0])
+        .reconnect
+        .initial_delay_ms,
+      2_000
+    );
+    assert_eq!(
+      document
+        .recovery
+        .resolve(&document.configs[1])
+        .reconnect
+        .initial_delay_ms,
+      4_000
+    );
+    assert_eq!(
+      document
+        .recovery
+        .resolve(&document.configs[2])
+        .reconnect
+        .initial_delay_ms,
+      3_000
+    );
+    assert_eq!(
+      document
+        .recovery
+        .resolve(&document.configs[3])
+        .reconnect
+        .initial_delay_ms,
+      1_000
+    );
     Ok(())
   }
 }

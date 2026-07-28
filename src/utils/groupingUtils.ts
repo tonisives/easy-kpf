@@ -1,26 +1,32 @@
-import type { PortForwardConfig } from "../hooks/hooks"
+import type { PortForwardConfig, RecoveryScopeKind } from "../hooks/hooks"
 
 export type GroupedConfig = {
+  key: string
   context: string
+  scopeKind: RecoveryScopeKind
   configs: PortForwardConfig[]
 }
 
 export let getConfigGroupKey = (config: PortForwardConfig) =>
-  config.forward_type === "Ssh" ? "SSH" : config.context
+  config.forward_type === "Ssh"
+    ? `ssh:${config.context}`
+    : `kubernetes:${config.context}`
 
 export let groupConfigsByContext = (configs: PortForwardConfig[]): GroupedConfig[] => {
   let grouped = configs.reduce((acc, config) => {
-    let contextKey = getConfigGroupKey(config)
+    let key = getConfigGroupKey(config)
 
-    if (!acc[contextKey]) {
-      acc[contextKey] = []
+    if (!acc[key]) {
+      acc[key] = {
+        key,
+        context: config.context,
+        scopeKind: config.forward_type === "Ssh" ? "ssh_host" : "kubernetes_context",
+        configs: [],
+      }
     }
-    acc[contextKey].push(config)
+    acc[key].configs.push(config)
     return acc
-  }, {} as Record<string, PortForwardConfig[]>)
+  }, {} as Record<string, GroupedConfig>)
 
-  return Object.entries(grouped).map(([context, configs]) => ({
-    context,
-    configs
-  }))
+  return Object.values(grouped)
 }

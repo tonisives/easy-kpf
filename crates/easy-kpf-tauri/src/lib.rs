@@ -82,6 +82,8 @@ pub fn run() {
     })
     .invoke_handler(tauri::generate_handler![
       get_port_forward_configs,
+      get_recovery_scopes,
+      set_recovery_scope,
       add_port_forward_config,
       update_port_forward_config,
       remove_port_forward_config,

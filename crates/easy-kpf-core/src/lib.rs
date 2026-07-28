@@ -12,6 +12,6 @@ pub use services::{
 pub use traits::{CommandExecutor, ProcessEvent, ProcessHandle, ProcessOutput};
 pub use types::{
   AppConfig, ForwardType, HookCommand, HookType, PortForwardConfig, PortForwardConfigs,
-  PortForwardHooks, ProcessInfo, ProcessManagerState, ReconnectPolicy, RecoverySettings,
-  SerializableProcessInfo,
+  PortForwardHooks, ProcessInfo, ProcessManagerState, ReconnectPolicy, RecoveryScopeKind,
+  RecoveryScopes, RecoverySettings, SerializableProcessInfo,
 };

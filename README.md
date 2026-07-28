@@ -134,19 +134,19 @@ forward is considered recovered after the replacement process remains alive for
 the configured stability period. Explicitly stopping a forward cancels pending
 reconnect attempts.
 
-Forwards use built-in reconnect defaults unless their entry in
-`port-forwards.yaml` contains a `recovery` override. This lets unrelated
-forwards use different retry policies and repair different upstream
-dependencies:
+Recovery can be shared by Kubernetes context or SSH host, then overridden for
+an individual forward. The lookup order is:
+
+1. The forward's own `recovery`
+2. Its entry under `recovery.kubernetes_contexts` or `recovery.ssh_hosts`
+3. Built-in reconnect defaults
+
+For example:
 
 ```yaml
-configs:
-  - name: db gp
-    context: tgs
-    namespace: infra
-    service: postgres-gp-1-cluster-rw
-    ports: ["8101:5432"]
-    recovery:
+recovery:
+  kubernetes_contexts:
+    tgs:
       reconnect:
         enabled: true
         initial_delay_ms: 1000
@@ -154,28 +154,55 @@ configs:
         stable_after_seconds: 30
         max_attempts: 0
       hooks:
-        on_failure: []
         before_reconnect:
           - type: command
-            command: /Users/me/bin/recover-kubernetes-tunnel
-            args: []
-            timeout_seconds: 30
+            command: /bin/launchctl
+            args:
+              - kickstart
+              - -k
+              - gui/501/com.example.kubernetes-tunnel
+            timeout_seconds: 15
             cooldown_seconds: 30
-        on_recovered: []
 
-  - name: demand map worker
+  ssh_hosts:
+    job-host:
+      reconnect:
+        enabled: true
+      hooks:
+        before_reconnect:
+          - type: ssh
+            ssh_host: bastion
+            command: sudo systemctl restart job-tunnel
+            args: []
+
+configs:
+  - name: db gp
     context: tgs
-    namespace: jobs
-    service: demand-map-worker
+    namespace: infra
+    service: postgres-gp-1-cluster-rw
+    ports: ["8101:5432"]
+
+  - name: job service
+    context: job-host
+    namespace: default
+    service: job-host
     ports: ["8102:8080"]
+    forward_type: Ssh
+
+  - name: special job
+    context: job-host
+    namespace: default
+    service: job-host
+    ports: ["8103:8080"]
+    forward_type: Ssh
     recovery:
       reconnect:
         enabled: true
       hooks:
         before_reconnect:
           - type: ssh
-            ssh_host: k3s-host
-            command: sudo systemctl restart demand-map-worker
+            ssh_host: bastion
+            command: sudo systemctl restart special-job-tunnel
             args: []
 ```
 
@@ -197,10 +224,10 @@ Local hook processes receive these environment variables:
 before each reconnect attempt. `on_recovered` runs after the replacement
 survives `stable_after_seconds`.
 
-Each forward's Settings dialog has a Recovery action for enabling a custom
-policy and configuring its first local or SSH `before_reconnect` hook.
-Additional lifecycle hooks can be added directly to YAML and are preserved when
-the UI saves that forward.
+Each Kubernetes context and SSH host group has a Recovery action for its shared
+policy. Each forward's Settings dialog has another Recovery action for an
+exception. Additional lifecycle hooks can be added directly to YAML and are
+preserved when the UI saves a forward or shared policy.
 
 A macOS recovery script for a launch agent can be as small as:
 

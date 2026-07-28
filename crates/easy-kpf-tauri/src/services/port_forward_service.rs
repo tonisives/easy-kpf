@@ -4,7 +4,9 @@ use easy_kpf_core::services::{
   ConfigCache, ConfigService, InterfaceManager, KubectlCommandBuilder, LastActiveSet,
   ProcessDetector, ProcessManager, SshCommandBuilder, SystemInterfaceManager,
 };
-use easy_kpf_core::types::{ForwardType, PortForwardConfig};
+use easy_kpf_core::types::{
+  ForwardType, PortForwardConfig, RecoveryScopeKind, RecoveryScopes, RecoverySettings,
+};
 use serde::Serialize;
 use std::time::Duration;
 use tauri::{Emitter, Manager};
@@ -61,6 +63,39 @@ impl PortForwardService {
 
   pub fn get_configs(&self) -> Result<Vec<PortForwardConfig>> {
     self.config_cache.get_configs()
+  }
+
+  pub fn get_recovery_scopes(&self) -> Result<RecoveryScopes> {
+    self.config_cache.get_recovery_scopes()
+  }
+
+  pub fn set_recovery_scope(
+    &self,
+    kind: RecoveryScopeKind,
+    key: String,
+    recovery: Option<RecoverySettings>,
+  ) -> Result<()> {
+    if key.trim().is_empty() {
+      return Err(AppError::InvalidInput(
+        "Recovery scope key cannot be empty".to_string(),
+      ));
+    }
+    let mut scopes = self.config_cache.get_recovery_scopes()?;
+    scopes.set(kind, key, recovery);
+    self.config_cache.update_recovery_scopes(scopes)
+  }
+
+  fn resolve_recovery_settings(&self, service_name: &str) -> Result<RecoverySettings> {
+    let config = self
+      .config_cache
+      .find_config(service_name)?
+      .ok_or_else(|| {
+        AppError::NotFound(format!(
+          "Configuration not found for service: {}",
+          service_name
+        ))
+      })?;
+    Ok(self.config_cache.get_recovery_scopes()?.resolve(&config))
   }
 
   pub fn add_config(&self, config: PortForwardConfig) -> Result<()> {
@@ -626,12 +661,7 @@ async fn recover_port_forward(
   initial_error: String,
 ) -> Result<()> {
   let port_forward_service = app_handle.state::<PortForwardService>();
-  let recovery_settings = port_forward_service
-    .get_configs()?
-    .into_iter()
-    .find(|config| config.name == service_name)
-    .and_then(|config| config.recovery)
-    .unwrap_or_default();
+  let recovery_settings = port_forward_service.resolve_recovery_settings(&service_name)?;
   if !recovery_settings.reconnect.enabled {
     log::info!("[{}] Automatic reconnect is disabled", service_name);
     return Ok(());

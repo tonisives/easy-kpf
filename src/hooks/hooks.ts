@@ -47,6 +47,13 @@ export type RecoverySettings = {
   }
 }
 
+export type RecoveryScopeKind = "kubernetes_context" | "ssh_host"
+
+export type RecoveryScopes = {
+  kubernetes_contexts: Record<string, RecoverySettings>
+  ssh_hosts: Record<string, RecoverySettings>
+}
+
 export type PortForwardConfig = {
   name: string
   context: string
@@ -66,14 +73,22 @@ export let useConfigs = (
   setAvailableServices: (ports: string[]) => void,
 ) => {
   let [configs, setConfigs] = useState<PortForwardConfig[]>([])
+  let [recoveryScopes, setRecoveryScopes] = useState<RecoveryScopes>({
+    kubernetes_contexts: {},
+    ssh_hosts: {},
+  })
   let [services, setServices] = useState<ServiceStatus[]>([])
   let [loading, setLoading] = useState<string | null>(null)
   let [formError, setFormError] = useState<string | undefined>(undefined)
 
   let loadConfigs = async () => {
     try {
-      let loadedConfigs: PortForwardConfig[] = await invoke("get_port_forward_configs")
+      let [loadedConfigs, loadedRecoveryScopes] = await Promise.all([
+        invoke<PortForwardConfig[]>("get_port_forward_configs"),
+        invoke<RecoveryScopes>("get_recovery_scopes"),
+      ])
       setConfigs(loadedConfigs)
+      setRecoveryScopes(loadedRecoveryScopes)
       setServices(loadedConfigs.map((config) => ({ name: config.name, running: false })))
     } catch (error) {
       console.error("Failed to load configs:", error)
@@ -233,6 +248,23 @@ export let useConfigs = (
     }
   }
 
+  let updateRecoveryScope = async (
+    kind: RecoveryScopeKind,
+    key: string,
+    recovery?: RecoverySettings,
+  ) => {
+    setFormError(undefined)
+    try {
+      await invoke("set_recovery_scope", { kind, key, recovery })
+      let loadedRecoveryScopes = await invoke<RecoveryScopes>("get_recovery_scopes")
+      setRecoveryScopes(loadedRecoveryScopes)
+      setMessage(`Updated recovery for ${key}`)
+    } catch (error) {
+      setFormError(`Error updating recovery: ${error}`)
+      throw error
+    }
+  }
+
   let reorderConfig = async (serviceKey: string, newIndex: number) => {
     let oldIndex = configs.findIndex((config) => config.name === serviceKey)
     if (oldIndex === -1) return
@@ -252,7 +284,7 @@ export let useConfigs = (
 
   let reorderGroup = async (groupKey: string, newIndex: number) => {
     let groups = groupConfigsByContext(configs)
-    let oldIndex = groups.findIndex((group) => group.context === groupKey)
+    let oldIndex = groups.findIndex((group) => group.key === groupKey)
     if (oldIndex === -1 || newIndex < 0 || newIndex >= groups.length) return
 
     let newGroups = [...groups]
@@ -373,6 +405,7 @@ export let useConfigs = (
 
   return {
     configs,
+    recoveryScopes,
     services,
     loading,
     formError,
@@ -382,6 +415,7 @@ export let useConfigs = (
     addConfig,
     removeConfig,
     updateConfig,
+    updateRecoveryScope,
     reorderConfig,
     reorderGroup,
     loadContexts,

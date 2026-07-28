@@ -571,6 +571,17 @@ p {
   font-size: 12px;
 }
 
+.group-recovery-button {
+  min-height: 22px;
+  padding: 1px 7px;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.group-recovery-button.active {
+  color: var(--green);
+}
+
 .settings-modal,
 .add-form-modal {
   position: fixed;
