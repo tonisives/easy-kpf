@@ -835,6 +835,10 @@ p {
   background: var(--accent);
 }
 
+.service-settings-actions .recovery-button {
+  color: var(--accent);
+}
+
 .service-settings-actions .delete-button {
   margin-right: auto;
   color: var(--red);

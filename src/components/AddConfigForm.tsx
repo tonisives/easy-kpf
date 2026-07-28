@@ -20,6 +20,7 @@ type AddConfigFormProps = {
     config: PortForwardConfig
     index: number
   } | null
+  focusRecovery?: boolean
 }
 
 let AddConfigForm = ({
@@ -29,6 +30,7 @@ let AddConfigForm = ({
   error,
   onClearError,
   editingConfig,
+  focusRecovery,
 }: AddConfigFormProps) => {
 
   let kubernetesData = useKubernetesDataFlow({
@@ -160,7 +162,10 @@ let AddConfigForm = ({
             value={connectionType === "ssh" ? "Ssh" : "Kubectl"}
           />
 
-          <RecoveryForm recovery={editingConfig?.config.recovery} />
+          <RecoveryForm
+            recovery={editingConfig?.config.recovery}
+            focusOnOpen={focusRecovery}
+          />
 
           <FormActions isEditing={isEditing} onCancel={handleCancel} />
         </form>

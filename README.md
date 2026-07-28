@@ -197,9 +197,10 @@ Local hook processes receive these environment variables:
 before each reconnect attempt. `on_recovered` runs after the replacement
 survives `stable_after_seconds`.
 
-The Add/Edit Port Forward form can enable a custom policy and configure its
-first local or SSH `before_reconnect` hook. Additional lifecycle hooks can be
-added directly to YAML and are preserved when the UI saves that forward.
+Each forward's Settings dialog has a Recovery action for enabling a custom
+policy and configuring its first local or SSH `before_reconnect` hook.
+Additional lifecycle hooks can be added directly to YAML and are preserved when
+the UI saves that forward.
 
 A macOS recovery script for a launch agent can be as small as:
 

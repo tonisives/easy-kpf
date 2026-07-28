@@ -1,17 +1,27 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { RecoverySettings } from "../hooks/hooks"
 
 type RecoveryFormProps = {
   recovery?: RecoverySettings
+  focusOnOpen?: boolean
 }
 
-export let RecoveryForm = ({ recovery }: RecoveryFormProps) => {
+export let RecoveryForm = ({ recovery, focusOnOpen = false }: RecoveryFormProps) => {
   let [customized, setCustomized] = useState(Boolean(recovery))
   let hook = recovery?.hooks.before_reconnect[0]
   let [hookType, setHookType] = useState<"command" | "ssh">(hook?.type || "command")
+  let sectionRef = useRef<HTMLElement>(null)
+  let customCheckboxRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!focusOnOpen) return
+
+    sectionRef.current?.scrollIntoView({ block: "start" })
+    customCheckboxRef.current?.focus()
+  }, [focusOnOpen])
 
   return (
-    <section className="embedded-settings-section">
+    <section className="embedded-settings-section" ref={sectionRef}>
       <div className="setup-section-heading">
         <div>
           <h3>Recovery</h3>
@@ -21,6 +31,7 @@ export let RecoveryForm = ({ recovery }: RecoveryFormProps) => {
           <input
             type="checkbox"
             name="recoveryOverride"
+            ref={customCheckboxRef}
             checked={customized}
             onChange={(event) => setCustomized(event.target.checked)}
           />
