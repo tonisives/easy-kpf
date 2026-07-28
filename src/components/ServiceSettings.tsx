@@ -3,12 +3,20 @@ import { PortForwardConfig } from "../hooks/hooks"
 type ServiceSettingsProps = {
   config: PortForwardConfig | null
   onEdit: (config: PortForwardConfig, index: number) => void
+  onConfigureRecovery: (config: PortForwardConfig, index: number) => void
   onDelete: (configName: string) => void
   onClose: () => void
   configs: PortForwardConfig[]
 }
 
-let ServiceSettings = ({ config, onEdit, onDelete, onClose, configs }: ServiceSettingsProps) => {
+let ServiceSettings = ({
+  config,
+  onEdit,
+  onConfigureRecovery,
+  onDelete,
+  onClose,
+  configs,
+}: ServiceSettingsProps) => {
   if (!config) return null
 
   let index = configs.findIndex((c) => c.name === config.name)
@@ -55,6 +63,15 @@ let ServiceSettings = ({ config, onEdit, onDelete, onClose, configs }: ServiceSe
           )}
         </div>
         <div className="service-settings-actions">
+          <button
+            onClick={() => {
+              onConfigureRecovery(config, index)
+              onClose()
+            }}
+            className="recovery-button"
+          >
+            Recovery...
+          </button>
           <button
             onClick={() => {
               onEdit(config, index)

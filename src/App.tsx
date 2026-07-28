@@ -57,6 +57,7 @@ function App() {
     config: PortForwardConfig
     index: number
   } | null>(null)
+  let [focusRecovery, setFocusRecovery] = useState(false)
   let [activeId, setActiveId] = useState<string | null>(null)
   let [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(loadCollapsedGroups)
   let [searchQuery, setSearchQuery] = useState("")
@@ -402,6 +403,12 @@ function App() {
       <ServiceSettings
         config={configs.find((c) => c.name === activeServiceSettings) || null}
         onEdit={(config, index) => {
+          setFocusRecovery(false)
+          setEditingConfig({ config, index })
+          setShowConfigForm(true)
+        }}
+        onConfigureRecovery={(config, index) => {
+          setFocusRecovery(true)
           setEditingConfig({ config, index })
           setShowConfigForm(true)
         }}
@@ -413,14 +420,17 @@ function App() {
       {editingConfig && (
         <AddConfigForm
           editingConfig={editingConfig}
+          focusRecovery={focusRecovery}
           onAdd={() => {}}
           onUpdate={(oldName, newConfig) => {
             updateConfig(oldName, newConfig)
             setEditingConfig(null)
+            setFocusRecovery(false)
           }}
           onClose={() => {
             setShowConfigForm(false)
             setEditingConfig(null)
+            setFocusRecovery(false)
             clearFormError()
           }}
           error={formError}
