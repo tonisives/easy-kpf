@@ -4,9 +4,14 @@ import { RecoverySettings } from "../hooks/hooks"
 type RecoveryFormProps = {
   recovery?: RecoverySettings
   focusOnOpen?: boolean
+  description?: string
 }
 
-export let RecoveryForm = ({ recovery, focusOnOpen = false }: RecoveryFormProps) => {
+export let RecoveryForm = ({
+  recovery,
+  focusOnOpen = false,
+  description = "Override automatic recovery for this port forward.",
+}: RecoveryFormProps) => {
   let [customized, setCustomized] = useState(Boolean(recovery))
   let hook = recovery?.hooks.before_reconnect[0]
   let [hookType, setHookType] = useState<"command" | "ssh">(hook?.type || "command")
@@ -25,7 +30,7 @@ export let RecoveryForm = ({ recovery, focusOnOpen = false }: RecoveryFormProps)
       <div className="setup-section-heading">
         <div>
           <h3>Recovery</h3>
-          <p>Override automatic recovery for this port forward.</p>
+          <p>{description}</p>
         </div>
         <label className="checkbox-label">
           <input

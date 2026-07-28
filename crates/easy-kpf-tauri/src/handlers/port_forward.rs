@@ -1,6 +1,8 @@
 use crate::reconnect;
 use crate::services::{KubectlService, PortForwardService};
-use easy_kpf_core::types::PortForwardConfig;
+use easy_kpf_core::types::{
+  PortForwardConfig, RecoveryScopeKind, RecoveryScopes, RecoverySettings,
+};
 use tauri::State;
 
 #[tauri::command]
@@ -9,6 +11,27 @@ pub fn get_port_forward_configs(
 ) -> Result<Vec<PortForwardConfig>, String> {
   port_forward_service
     .get_configs()
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_recovery_scopes(
+  port_forward_service: State<'_, PortForwardService>,
+) -> Result<RecoveryScopes, String> {
+  port_forward_service
+    .get_recovery_scopes()
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_recovery_scope(
+  kind: RecoveryScopeKind,
+  key: String,
+  recovery: Option<RecoverySettings>,
+  port_forward_service: State<'_, PortForwardService>,
+) -> Result<(), String> {
+  port_forward_service
+    .set_recovery_scope(kind, key, recovery)
     .map_err(|e| e.to_string())
 }
 

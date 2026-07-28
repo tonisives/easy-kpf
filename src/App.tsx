@@ -21,8 +21,13 @@ import ServiceSettings from "./components/ServiceSettings"
 import AddConfigForm from "./components/AddConfigForm"
 import SetupScreen from "./components/SetupScreen"
 import ContextAccordion from "./components/ContextAccordion"
+import { RecoveryScopeForm } from "./components/RecoveryScopeForm"
 import "./App.css"
-import { PortForwardConfig, useConfigs } from "./hooks/hooks"
+import {
+  PortForwardConfig,
+  RecoveryScopeKind,
+  useConfigs,
+} from "./hooks/hooks"
 import { getConfigGroupKey, groupConfigsByContext } from "./utils/groupingUtils"
 
 const COLLAPSED_GROUPS_STORAGE_KEY = "easy-kpf.collapsed-groups"
@@ -58,6 +63,11 @@ function App() {
     index: number
   } | null>(null)
   let [focusRecovery, setFocusRecovery] = useState(false)
+  let [activeRecoveryScope, setActiveRecoveryScope] = useState<{
+    kind: RecoveryScopeKind
+    key: string
+    label: string
+  } | null>(null)
   let [activeId, setActiveId] = useState<string | null>(null)
   let [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(loadCollapsedGroups)
   let [searchQuery, setSearchQuery] = useState("")
@@ -65,6 +75,7 @@ function App() {
   let searchInputRef = useRef<HTMLInputElement>(null)
   let {
     configs,
+    recoveryScopes,
     services,
     loading,
     formError,
@@ -72,6 +83,7 @@ function App() {
     addConfig,
     removeConfig,
     updateConfig,
+    updateRecoveryScope,
     reorderConfig,
     reorderGroup,
     stopPortForward,
@@ -180,8 +192,8 @@ function App() {
             let overConfig = configs.find((config) => config.name === over?.id)
             return overConfig ? getConfigGroupKey(overConfig) : undefined
           })()
-      let oldIndex = groupedConfigs.findIndex((group) => group.context === groupKey)
-      let newIndex = groupedConfigs.findIndex((group) => group.context === overGroupKey)
+      let oldIndex = groupedConfigs.findIndex((group) => group.key === groupKey)
+      let newIndex = groupedConfigs.findIndex((group) => group.key === overGroupKey)
 
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
         reorderGroup(groupKey, newIndex).catch((error: any) => {
@@ -312,22 +324,30 @@ function App() {
           onDragCancel={() => setActiveId(null)}
         >
           <SortableContext
-            items={groupedConfigs.map((group) => `group:${group.context}`)}
+            items={groupedConfigs.map((group) => `group:${group.key}`)}
             strategy={verticalListSortingStrategy}
           >
             {groupedConfigs.map((group) => (
               <ContextAccordion
-                key={group.context}
+                key={group.key}
                 group={group}
                 services={services}
                 loading={loading}
                 onStart={startPortForward}
                 onStop={stopPortForward}
                 onSettings={setActiveServiceSettings}
+                onRecovery={(kind, key, label) => {
+                  setActiveRecoveryScope({ kind, key, label })
+                }}
                 onClearError={clearServiceError}
-                isExpanded={!collapsedGroups.has(group.context)}
-                onToggle={() => toggleGroup(group.context)}
+                isExpanded={!collapsedGroups.has(group.key)}
+                onToggle={() => toggleGroup(group.key)}
                 dragDisabled={Boolean(searchQuery.trim())}
+                hasRecovery={Boolean(
+                  group.scopeKind === "ssh_host"
+                    ? recoveryScopes.ssh_hosts[group.context]
+                    : recoveryScopes.kubernetes_contexts[group.context],
+                )}
               />
             ))}
           </SortableContext>
@@ -336,7 +356,7 @@ function App() {
               ? (() => {
                   if (activeId.startsWith("group:")) {
                     let group = groupedConfigs.find(
-                      (candidate) => `group:${candidate.context}` === activeId,
+                      (candidate) => `group:${candidate.key}` === activeId,
                     )
                     return group ? (
                       <div className="group-drag-overlay">
@@ -415,6 +435,7 @@ function App() {
         onDelete={removeConfig}
         onClose={() => setActiveServiceSettings(null)}
         configs={configs}
+        recoveryScopes={recoveryScopes}
       />
 
       {editingConfig && (
@@ -435,6 +456,26 @@ function App() {
           }}
           error={formError}
           onClearError={clearFormError}
+        />
+      )}
+
+      {activeRecoveryScope && (
+        <RecoveryScopeForm
+          kind={activeRecoveryScope.kind}
+          scopeKey={activeRecoveryScope.key}
+          label={activeRecoveryScope.label}
+          recovery={
+            activeRecoveryScope.kind === "ssh_host"
+              ? recoveryScopes.ssh_hosts[activeRecoveryScope.key]
+              : recoveryScopes.kubernetes_contexts[activeRecoveryScope.key]
+          }
+          error={formError}
+          onClearError={clearFormError}
+          onSave={updateRecoveryScope}
+          onClose={() => {
+            setActiveRecoveryScope(null)
+            clearFormError()
+          }}
         />
       )}
 

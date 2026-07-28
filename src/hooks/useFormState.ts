@@ -31,7 +31,7 @@ let formInteger = (formData: FormData, name: string, fallback: number, minimum =
   return Number.isFinite(parsed) ? Math.max(minimum, Math.trunc(parsed)) : fallback
 }
 
-let parseRecovery = (
+export let parseRecovery = (
   formData: FormData,
   existing?: RecoverySettings,
 ): RecoverySettings | undefined => {
