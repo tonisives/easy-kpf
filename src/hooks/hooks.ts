@@ -140,15 +140,21 @@ export let useConfigs = (
     }
   }
 
+  let reconcilePortForwards = async () => {
+    await verifyPortForwards()
+    await syncWithExistingProcesses()
+    await updateServiceStatus()
+  }
+
   useEffect(() => {
     // Show configs immediately, then sync process state in background
     loadConfigs().then(() => {
-      syncWithExistingProcesses().then(updateServiceStatus)
+      reconcilePortForwards()
     })
 
-    // Set up periodic verification of port forwards
+    // Reconcile tracked PIDs with processes that may have been replaced by ekpfctl.
     let verificationInterval = setInterval(() => {
-      verifyPortForwards()
+      reconcilePortForwards()
     }, 5000) // Check every 5 seconds
 
     // Listen for runtime errors from port forward processes
